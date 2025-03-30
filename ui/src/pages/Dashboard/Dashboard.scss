@@ -1,0 +1,133 @@
+@import '../../styles/variables.scss';
+@import '../../styles/mixins.scss';
+
+.dashboard-container {
+  .overview-section {
+    .stat-card {
+      height: 100%;
+      @include transition(transform);
+      
+      &:hover {
+        transform: translateY(-4px);
+      }
+    }
+    
+    .provider-card {
+      .provider-stat-card {
+        @include card-hover;
+      }
+    }
+  }
+  
+  .resource-section {
+    .resource-chart-container {
+      .resource-summary {
+        margin-bottom: 16px;
+        
+        .resource-label {
+          margin-right: 8px;
+          font-weight: 500;
+        }
+      }
+      
+      .resource-chart {
+        margin-top: 16px;
+        
+        // Style chart tooltip
+        .recharts-tooltip-wrapper {
+          .recharts-default-tooltip {
+            background-color: var(--card-background) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: $border-radius-base;
+            
+            .recharts-tooltip-label {
+              color: var(--text-color-secondary);
+            }
+            
+            .recharts-tooltip-item-list {
+              .recharts-tooltip-item {
+                .recharts-tooltip-item-name {
+                  color: var(--text-color);
+                }
+                
+                .recharts-tooltip-item-separator {
+                  color: var(--text-color-secondary);
+                }
+                
+                .recharts-tooltip-item-value {
+                  color: var(--text-color);
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      .resource-note {
+        margin-top: 16px;
+        text-align: center;
+        color: var(--text-color-secondary);
+        font-size: $font-size-sm;
+      }
+    }
+  }
+  
+  .activity-section {
+    .activity-list {
+      max-height: 500px;
+      overflow-y: auto;
+      
+      .activity-item {
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-color);
+        
+        &:last-child {
+          border-bottom: none;
+        }
+        
+        .vm-name {
+          cursor: pointer;
+          color: var(--primary-color);
+          
+          &:hover {
+            text-decoration: underline;
+          }
+        }
+        
+        .activity-details {
+          .activity-message {
+            margin-bottom: 4px;
+          }
+          
+          .activity-meta {
+            font-size: $font-size-sm;
+            color: var(--text-color-secondary);
+          }
+        }
+      }
+    }
+  }
+}
+
+// Responsive styles
+@include mobile {
+  .dashboard-container {
+    .overview-section {
+      .ant-card-extra {
+        display: block;
+        margin-top: 8px;
+        float: none;
+        text-align: left;
+      }
+    }
+    
+    .resource-section {
+      .ant-card-extra {
+        display: block;
+        margin-top: 8px;
+        float: none;
+        text-align: left;
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+// Light theme styles
+
+@import '../variables.scss';
+
+:root {
+  --primary-color: #{$primary-color};
+  --primary-color-dark: #{$primary-color-dark};
+  --success-color: #{$success-color};
+  --warning-color: #{$warning-color};
+  --error-color: #{$error-color};
+  --info-color: #{$info-color};
+  
+  --text-color: #{$text-color};
+  --text-color-secondary: #{$text-color-secondary};
+  --disabled-color: #{$disabled-color};
+  --border-color: #{$border-color};
+  --background-color: #{$background-color};
+  
+  --header-background: #fff;
+  --sidebar-background: #fff;
+  --content-background: #fff;
+
+  // Card styles
+  --card-background: #fff;
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  
+  // Input styles
+  --input-background: #fff;
+  --input-border: #{$border-color};
+  
+  // Button styles
+  --button-background: #fff;
+  --button-text: #{$text-color};
+  
+  // Form styles
+  --form-label: #{$text-color};
+  --form-text: #{$text-color};
+  
+  // Table styles
+  --table-header-bg: #fafafa;
+  --table-row-hover: #f5f5f5;
+  
+  // Modal styles
+  --modal-background: #fff;
+  --modal-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+  // Notification styles
+  --notification-background: #fff;
+  --notification-border: #{$border-color};
+  
+  // Login/Register specific
+  --auth-page-background: #f0f2f5;
+  --auth-card-background: #fff;
+}

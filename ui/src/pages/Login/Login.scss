@@ -1,0 +1,207 @@
+@import '../../styles/variables.scss';
+@import '../../styles/mixins.scss';
+
+.login-container {
+  height: 100vh;
+  @include flex-center;
+  position: relative;
+  background-color: var(--auth-page-background);
+  overflow: hidden;
+}
+
+.login-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, $primary-color-dark 0%, $primary-color 100%);
+  opacity: 0.1;
+  
+  [data-theme="dark"] & {
+    opacity: 0.05;
+  }
+  
+  // Background pattern
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231890ff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+}
+
+.login-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  padding: 0 16px;
+}
+
+.login-card {
+  width: 100%;
+  @include box-shadow(2);
+  background-color: var(--auth-card-background);
+  border-radius: $border-radius-lg;
+  overflow: hidden;
+}
+
+.login-header {
+  text-align: center;
+  padding: 30px 0;
+  
+  .logo-text {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    @include gradient-text(linear-gradient(90deg, $primary-color-dark, $primary-color));
+    
+    [data-theme="dark"] & {
+      @include gradient-text(linear-gradient(90deg, $dark-primary-color, lighten($dark-primary-color, 10%)));
+    }
+  }
+  
+  .subtitle {
+    color: var(--text-color-secondary);
+    font-size: 16px;
+  }
+}
+
+.login-form {
+  padding: 0 24px 24px;
+  
+  .ant-form-item-label {
+    label {
+      color: var(--form-label);
+    }
+  }
+  
+  .ant-form-item-explain-error {
+    margin-top: 4px;
+  }
+  
+  .login-form-button {
+    width: 100%;
+    height: 40px;
+    font-size: 16px;
+  }
+  
+  .login-form-forgot {
+    float: right;
+  }
+  
+  .ant-divider {
+    margin: 24px 0;
+  }
+  
+  .register-link {
+    text-align: center;
+    margin-top: 16px;
+    
+    a {
+      color: $primary-color;
+      
+      [data-theme="dark"] & {
+        color: $dark-primary-color;
+      }
+      
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+// Social login buttons
+.social-login {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+  
+  .social-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    @include flex-center;
+    background-color: #f5f5f5;
+    cursor: pointer;
+    @include transition();
+    
+    [data-theme="dark"] & {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    &:hover {
+      transform: translateY(-2px);
+    }
+    
+    &.google {
+      color: #DB4437;
+    }
+    
+    &.facebook {
+      color: #4267B2;
+    }
+    
+    &.github {
+      color: #333;
+      
+      [data-theme="dark"] & {
+        color: #fff;
+      }
+    }
+  }
+}
+
+// Responsive styles
+@include mobile {
+  .login-card {
+    border-radius: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  
+  .login-content {
+    max-width: 100%;
+    padding: 0;
+  }
+}
+
+// Loading spinner overlay
+.login-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  @include flex-center;
+  z-index: 2;
+  
+  [data-theme="dark"] & {
+    background: rgba(0, 0, 0, 0.7);
+  }
+}
+
+// Animation for login card
+.login-card {
+  animation: fadeInUp 0.5s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

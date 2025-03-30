@@ -1,0 +1,54 @@
+// Dark theme styles
+
+@import '../variables.scss';
+
+:root[data-theme="dark"] {
+  --primary-color: #{$dark-primary-color};
+  --primary-color-dark: #0958d9;
+  --success-color: #49aa19;
+  --warning-color: #d89614;
+  --error-color: #d32029;
+  --info-color: #{$dark-primary-color};
+  
+  --text-color: #{$dark-text-color};
+  --text-color-secondary: #{$dark-text-color-secondary};
+  --disabled-color: rgba(255, 255, 255, 0.25);
+  --border-color: #{$dark-border-color};
+  --background-color: #{$dark-background};
+  
+  --header-background: #{$dark-component-background};
+  --sidebar-background: #{$dark-background};
+  --content-background: #{$dark-component-background};
+
+  // Card styles
+  --card-background: #{$dark-component-background};
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  
+  // Input styles
+  --input-background: #{$dark-component-background};
+  --input-border: #{$dark-border-color};
+  
+  // Button styles
+  --button-background: #{$dark-component-background};
+  --button-text: #{$dark-text-color};
+  
+  // Form styles
+  --form-label: #{$dark-text-color};
+  --form-text: #{$dark-text-color};
+  
+  // Table styles
+  --table-header-bg: #1d1d1d;
+  --table-row-hover: #303030;
+  
+  // Modal styles
+  --modal-background: #{$dark-component-background};
+  --modal-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  
+  // Notification styles
+  --notification-background: #{$dark-component-background};
+  --notification-border: #{$dark-border-color};
+  
+  // Login/Register specific
+  --auth-page-background: #121212;
+  --auth-card-background: #{$dark-component-background};
+}
