@@ -1,0 +1,149 @@
+// Header.scss
+.iw-header {
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    background-color: var(--bg-color-header);
+    border-bottom: 1px solid var(--border-color);
+    
+    &__left {
+      display: flex;
+      align-items: center;
+    }
+    
+    &__right {
+      display: flex;
+      align-items: center;
+    }
+    
+    &__menu-button {
+      margin-right: 16px;
+      font-size: 20px;
+    }
+    
+    &__breadcrumb-container {
+      display: flex;
+      align-items: center;
+    }
+    
+    &__search-container {
+      display: flex;
+      align-items: center;
+      margin-right: 8px;
+    }
+    
+    &__search-close {
+      margin-left: 8px;
+    }
+    
+    &__action-button {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      margin: 0 4px;
+      font-size: 18px;
+      
+      &:hover {
+        background-color: var(--bg-color-hover);
+      }
+    }
+    
+    &__notifications {
+      position: relative;
+    }
+    
+    &__notification-badge {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background-color: var(--color-error);
+      color: white;
+      border-radius: 10px;
+      font-size: 10px;
+      padding: 2px 6px;
+      min-width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    &__user {
+      margin-left: 12px;
+    }
+    
+    &__user-trigger {
+      display: flex;
+      align-items: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 4px;
+      
+      &:hover {
+        background-color: var(--bg-color-hover);
+      }
+    }
+    
+    &__user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    
+    &__user-initials {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: var(--brand-color);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+    }
+    
+    &__user-name {
+      margin: 0 8px;
+      font-weight: 500;
+      max-width: 150px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      
+      @media (max-width: 768px) {
+        display: none;
+      }
+    }
+    
+    &__user-icon {
+      font-size: 12px;
+      color: var(--text-color-secondary);
+      
+      @media (max-width: 768px) {
+        display: none;
+      }
+    }
+    
+    &__dropdown-link {
+      display: flex;
+      align-items: center;
+      color: var(--text-color-primary);
+      text-decoration: none;
+      
+      i {
+        margin-right: 8px;
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+  }
+  

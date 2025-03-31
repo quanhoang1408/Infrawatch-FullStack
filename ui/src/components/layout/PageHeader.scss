@@ -1,0 +1,45 @@
+// PageHeader.scss
+.iw-page-header {
+    margin-bottom: 24px;
+    
+    &__breadcrumb {
+      margin-bottom: 16px;
+    }
+    
+    &__container {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      
+      @media (max-width: 576px) {
+        flex-direction: column;
+      }
+    }
+    
+    &__info {
+      flex: 1;
+    }
+    
+    &__title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text-color-primary);
+      margin: 0 0 8px 0;
+    }
+    
+    &__subtitle {
+      color: var(--text-color-secondary);
+      font-size: 14px;
+    }
+    
+    &__actions {
+      display: flex;
+      gap: 8px;
+      
+      @media (max-width: 576px) {
+        margin-top: 16px;
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+  }

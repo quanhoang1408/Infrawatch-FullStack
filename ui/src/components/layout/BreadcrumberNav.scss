@@ -1,0 +1,49 @@
+// BreadcrumbNav.scss
+.iw-breadcrumb {
+    &__list {
+      display: flex;
+      flex-wrap: wrap;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    &__item {
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      
+      &--active {
+        color: var(--text-color-primary);
+        font-weight: 500;
+      }
+    }
+    
+    &__link {
+      display: flex;
+      align-items: center;
+      color: var(--text-color-secondary);
+      text-decoration: none;
+      
+      &:hover {
+        color: var(--brand-color);
+      }
+    }
+    
+    &__current {
+      display: flex;
+      align-items: center;
+    }
+    
+    &__icon {
+      display: flex;
+      align-items: center;
+      margin-right: 4px;
+      font-size: 16px;
+    }
+    
+    &__separator {
+      margin: 0 8px;
+      color: var(--text-color-tertiary);
+    }
+  }
