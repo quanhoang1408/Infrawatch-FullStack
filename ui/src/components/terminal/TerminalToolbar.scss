@@ -1,0 +1,58 @@
+// TerminalToolbar.scss
+.iw-terminal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    background-color: var(--bg-color-terminal-toolbar);
+    border-bottom: 1px solid var(--border-color);
+    
+    &__connection {
+      display: flex;
+      align-items: center;
+    }
+    
+    &__vm-name {
+      display: flex;
+      align-items: center;
+      margin-left: 12px;
+      font-size: 14px;
+      color: var(--text-color-secondary);
+      
+      i {
+        margin-right: 6px;
+        font-size: 16px;
+      }
+    }
+    
+    &__actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    &__search-form {
+      display: flex;
+      align-items: center;
+      background-color: var(--bg-color-input);
+      border-radius: 4px;
+      padding: 0 4px;
+    }
+    
+    &__search-input {
+      border: none;
+      background: transparent;
+      padding: 6px 8px;
+      font-size: 14px;
+      color: var(--text-color-primary);
+      width: 200px;
+      
+      &:focus {
+        outline: none;
+      }
+      
+      &::placeholder {
+        color: var(--text-color-tertiary);
+      }
+    }
+  }

@@ -1,0 +1,18 @@
+// VMActions.scss
+.iw-vm-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    &__primary-action {
+      margin-right: 4px;
+    }
+    
+    &__more-action {
+      color: var(--text-color-secondary);
+    }
+    
+    &__terminate-action {
+      color: var(--color-error);
+    }
+  }

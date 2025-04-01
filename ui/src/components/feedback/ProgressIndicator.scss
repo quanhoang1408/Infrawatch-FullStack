@@ -1,0 +1,145 @@
+// ProgressIndicator.scss
+.iw-progress {
+    display: flex;
+    align-items: center;
+    
+    // Line progress styles
+    &--line {
+      width: 100%;
+    }
+    
+    &__outer {
+      flex: 1;
+      background-color: var(--bg-color-progress);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    
+    &__trail {
+      width: 100%;
+      background-color: var(--bg-color-progress);
+      height: 8px;
+      border-radius: 100px;
+    }
+    
+    &__bar {
+      height: 100%;
+      border-radius: 100px;
+      background-color: var(--brand-color);
+      transition: width 0.3s ease;
+    }
+    
+    &__info {
+      margin-left: 10px;
+      min-width: 40px;
+      text-align: right;
+      color: var(--text-color-secondary);
+      font-size: 14px;
+    }
+    
+    // Size variants
+    &--small &__trail {
+      height: 4px;
+    }
+    
+    &--large &__trail {
+      height: 12px;
+    }
+    
+    // Status variants
+    &--success &__bar {
+      background-color: var(--color-success);
+    }
+    
+    &--error &__bar {
+      background-color: var(--color-error);
+    }
+    
+    &--active &__bar {
+      background-color: var(--brand-color);
+      background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 16px 16px;
+      animation: progress-stripes 1s linear infinite;
+    }
+    
+    // Striped effect
+    &--striped &__bar {
+      background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 16px 16px;
+    }
+    
+    // Circle progress styles
+    &--circle {
+      position: relative;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    &__circle-svg {
+      transform: rotate(-90deg);
+    }
+    
+    &__circle-trail {
+      stroke: var(--bg-color-progress);
+    }
+    
+    &__circle-bar {
+      stroke: var(--brand-color);
+      transition: stroke-dashoffset 0.3s ease;
+    }
+    
+    &--success &__circle-bar {
+      stroke: var(--color-success);
+    }
+    
+    &--error &__circle-bar {
+      stroke: var(--color-error);
+    }
+    
+    &__circle-info {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      font-size: 14px;
+      color: var(--text-color-primary);
+    }
+    
+    &--small &__circle-info {
+      font-size: 12px;
+    }
+    
+    &--large &__circle-info {
+      font-size: 20px;
+    }
+    
+    // Animation keyframes
+    @keyframes progress-stripes {
+      from {
+        background-position: 16px 0;
+      }
+      to {
+        background-position: 0 0;
+      }
+    }
+  }

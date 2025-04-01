@@ -1,0 +1,25 @@
+// ResourceUsage.scss
+.iw-resource-usage {
+    height: 100%;
+    
+    &__charts {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    
+    &__chart-container {
+      width: 100%;
+    }
+    
+    &__chart-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-color-primary);
+      margin-bottom: 16px;
+    }
+    
+    &__chart {
+      width: 100%;
+    }
+  }
