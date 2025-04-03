@@ -1,251 +1,252 @@
-import React, { useState } from 'react';
-import { Card, Tabs, Radio, Progress, Empty, Space } from 'antd';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  Legend, 
-  ResponsiveContainer 
-} from 'recharts';
-import dayjs from 'dayjs';
-
-const { TabPane } = Tabs;
+import React, { useState, useMemo } from 'react';
+import { ResourceUsage } from '../../components/dashboard';
+import { Card, CardHeader, CardTitle, CardContent, Tabs } from '../../components/common';
+import { LineChart, AreaChart, BarChart } from '../../components/charts';
 
 /**
- * Resource section component for dashboard
+ * Component hiển thị phần tài nguyên trong Dashboard
  * 
- * @param {Object} props - Component props
- * @param {Object} props.usage - Resource usage data
+ * @param {Object} props - Props component
+ * @param {Object} props.dashboardData - Dữ liệu dashboard
+ * @param {Array} props.vms - Danh sách máy ảo
+ * @param {string} props.timeRange - Khoảng thời gian
+ * @returns {JSX.Element} Component phần tài nguyên
  */
-const ResourceSection = ({ usage }) => {
-  const [timeRange, setTimeRange] = useState('1h');
+const ResourceSection = ({ dashboardData, vms, timeRange }) => {
+  const [selectedResource, setSelectedResource] = useState('cpu');
+  const [selectedVMs, setSelectedVMs] = useState([]);
+  const [chartType, setChartType] = useState('line');
 
-  // Format timestamp for chart
-  const formatTimestamp = (timestamp) => {
-    return dayjs(timestamp).format('HH:mm');
+  // Tính toán dữ liệu cho biểu đồ tổng hợp
+  const aggregatedData = useMemo(() => {
+    if (!dashboardData || !dashboardData.resourceUsage) {
+      return [];
+    }
+
+    return dashboardData.resourceUsage[selectedResource] || [];
+  }, [dashboardData, selectedResource]);
+
+  // Tính toán dữ liệu cho biểu đồ chi tiết
+  const detailedData = useMemo(() => {
+    if (!dashboardData || !dashboardData.vmResourceUsage || selectedVMs.length === 0) {
+      return [];
+    }
+
+    // Lấy dữ liệu của các VM được chọn
+    const filtered = {};
+    selectedVMs.forEach(vmId => {
+      const vmData = dashboardData.vmResourceUsage[vmId];
+      if (vmData && vmData[selectedResource]) {
+        filtered[vmId] = vmData[selectedResource];
+      }
+    });
+
+    // Chuyển đổi dữ liệu sang định dạng cho biểu đồ
+    const result = [];
+    const timestamps = new Set();
+    
+    // Thu thập tất cả các mốc thời gian
+    Object.values(filtered).forEach(data => {
+      data.forEach(point => {
+        timestamps.add(point.timestamp);
+      });
+    });
+    
+    // Sắp xếp các mốc thời gian
+    const sortedTimestamps = Array.from(timestamps).sort();
+    
+    // Tạo dữ liệu cho mỗi mốc thời gian
+    sortedTimestamps.forEach(timestamp => {
+      const dataPoint = { timestamp: new Date(timestamp).toLocaleString() };
+      
+      selectedVMs.forEach(vmId => {
+        const vmName = vms.find(vm => vm.id === vmId)?.name || vmId;
+        const pointData = filtered[vmId]?.find(point => point.timestamp === timestamp);
+        dataPoint[vmName] = pointData ? pointData.value : null;
+      });
+      
+      result.push(dataPoint);
+    });
+    
+    return result;
+  }, [dashboardData, selectedVMs, selectedResource, vms]);
+
+  // Lấy tên máy ảo từ ID
+  const getVMName = (vmId) => {
+    const vm = vms.find(vm => vm.id === vmId);
+    return vm ? vm.name : vmId;
   };
 
-  // Format time range for display
-  const formatTimeRangeLabel = (range) => {
-    switch (range) {
-      case '1h':
-        return '1 giờ qua';
-      case '6h':
-        return '6 giờ qua';
-      case '24h':
-        return '24 giờ qua';
-      case '7d':
-        return '7 ngày qua';
+  // Xử lý khi chọn/bỏ chọn máy ảo
+  const handleVMToggle = (vmId) => {
+    setSelectedVMs(prev => {
+      if (prev.includes(vmId)) {
+        return prev.filter(id => id !== vmId);
+      } else {
+        return [...prev, vmId];
+      }
+    });
+  };
+
+  // Nếu không có dữ liệu
+  if (!dashboardData || !dashboardData.resourceUsage) {
+    return (
+      <section className="dashboard-section resource-section">
+        <div className="section-content loading">
+          <p>Đang tải dữ liệu tài nguyên...</p>
+        </div>
+      </section>
+    );
+  }
+
+  // Tạo các tab tài nguyên
+  const resourceTabs = [
+    { id: 'cpu', label: 'CPU', icon: 'cpu' },
+    { id: 'memory', label: 'Bộ nhớ', icon: 'database' },
+    { id: 'disk', label: 'Ổ đĩa', icon: 'hard-drive' },
+    { id: 'network', label: 'Mạng', icon: 'wifi' }
+  ];
+
+  // Chọn loại biểu đồ
+  const renderChart = () => {
+    const commonProps = {
+      data: detailedData.length > 0 ? detailedData : aggregatedData,
+      xAxisKey: 'timestamp',
+      height: 300,
+      showLegend: true,
+      showTooltip: true,
+      showGrid: true
+    };
+
+    const seriesKeys = detailedData.length > 0 
+      ? selectedVMs.map(vmId => getVMName(vmId)) 
+      : ['value'];
+
+    switch (chartType) {
+      case 'area':
+        return <AreaChart {...commonProps} seriesKeys={seriesKeys} />;
+      case 'bar':
+        return <BarChart {...commonProps} seriesKeys={seriesKeys} />;
+      case 'line':
       default:
-        return range;
+        return <LineChart {...commonProps} seriesKeys={seriesKeys} />;
     }
   };
 
-  // Get progress status based on value
-  const getProgressStatus = (value) => {
-    if (value >= 90) return 'exception';
-    if (value >= 70) return 'warning';
-    return 'normal';
-  };
-
   return (
-    <Card 
-      title="Sử dụng tài nguyên"
-      className="resource-section"
-      extra={
-        <Radio.Group 
-          value={timeRange} 
-          onChange={e => setTimeRange(e.target.value)}
-          size="small"
-        >
-          <Radio.Button value="1h">1 giờ</Radio.Button>
-          <Radio.Button value="6h">6 giờ</Radio.Button>
-          <Radio.Button value="24h">24 giờ</Radio.Button>
-          <Radio.Button value="7d">7 ngày</Radio.Button>
-        </Radio.Group>
-      }
-    >
-      <Tabs defaultActiveKey="cpu">
-        <TabPane tab="CPU" key="cpu">
-          <div className="resource-chart-container">
-            <div className="resource-summary">
-              <span className="resource-label">Trung bình:</span>
-              <Progress 
-                percent={usage?.cpu?.average || 0} 
-                status={getProgressStatus(usage?.cpu?.average || 0)}
-              />
-            </div>
-            
-            {usage?.cpu?.data && usage.cpu.data.length > 0 ? (
-              <div className="resource-chart">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={usage.cpu.data}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="time" 
-                      tickFormatter={formatTimestamp}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} />
-                    <RechartsTooltip 
-                      formatter={(value) => [`${value}%`, 'CPU']}
-                      labelFormatter={(time) => dayjs(time).format('DD/MM/YYYY HH:mm:ss')}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#1890ff" 
-                      name="CPU" 
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <Empty description="Không có dữ liệu" />
-            )}
-          </div>
-        </TabPane>
-        
-        <TabPane tab="RAM" key="ram">
-          <div className="resource-chart-container">
-            <div className="resource-summary">
-              <span className="resource-label">Trung bình:</span>
-              <Progress 
-                percent={usage?.ram?.average || 0} 
-                status={getProgressStatus(usage?.ram?.average || 0)}
-              />
-            </div>
-            
-            {usage?.ram?.data && usage.ram.data.length > 0 ? (
-              <div className="resource-chart">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={usage.ram.data}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="time" 
-                      tickFormatter={formatTimestamp}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} />
-                    <RechartsTooltip 
-                      formatter={(value) => [`${value}%`, 'RAM']}
-                      labelFormatter={(time) => dayjs(time).format('DD/MM/YYYY HH:mm:ss')}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#52c41a" 
-                      name="RAM" 
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <Empty description="Không có dữ liệu" />
-            )}
-          </div>
-        </TabPane>
-        
-        <TabPane tab="Disk" key="disk">
-          <div className="resource-chart-container">
-            <div className="resource-summary">
-              <span className="resource-label">Trung bình:</span>
-              <Progress 
-                percent={usage?.disk?.average || 0} 
-                status={getProgressStatus(usage?.disk?.average || 0)}
-              />
-            </div>
-            
-            {usage?.disk?.data && usage.disk.data.length > 0 ? (
-              <div className="resource-chart">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={usage.disk.data}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="time" 
-                      tickFormatter={formatTimestamp}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} />
-                    <RechartsTooltip 
-                      formatter={(value) => [`${value}%`, 'Disk']}
-                      labelFormatter={(time) => dayjs(time).format('DD/MM/YYYY HH:mm:ss')}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#faad14" 
-                      name="Disk" 
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <Empty description="Không có dữ liệu" />
-            )}
-          </div>
-        </TabPane>
-        
-        <TabPane tab="Network" key="network">
-          <div className="resource-chart-container">
-            <div className="resource-summary">
-              <span className="resource-label">Trung bình:</span>
-              <Progress 
-                percent={usage?.network?.average || 0} 
-                status={getProgressStatus(usage?.network?.average || 0)}
-              />
-            </div>
-            
-            {usage?.network?.data && usage.network.data.length > 0 ? (
-              <div className="resource-chart">
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={usage.network.data}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="time" 
-                      tickFormatter={formatTimestamp}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} />
-                    <RechartsTooltip 
-                      formatter={(value) => [`${value}%`, 'Network']}
-                      labelFormatter={(time) => dayjs(time).format('DD/MM/YYYY HH:mm:ss')}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#722ed1" 
-                      name="Network" 
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <Empty description="Không có dữ liệu" />
-            )}
-          </div>
-        </TabPane>
-      </Tabs>
+    <section className="dashboard-section resource-section">
+      <h2 className="section-title">Sử dụng tài nguyên</h2>
       
-      <div className="resource-note">
-        <p>Dữ liệu được cập nhật cho khoảng thời gian: {formatTimeRangeLabel(timeRange)}</p>
+      <div className="section-content">
+        <div className="resource-usage-overview">
+          <ResourceUsage 
+            cpuUsage={dashboardData.systemResourceUsage.cpu}
+            memoryUsage={dashboardData.systemResourceUsage.memory}
+            diskUsage={dashboardData.systemResourceUsage.disk}
+            networkUsage={dashboardData.systemResourceUsage.network}
+          />
+        </div>
+
+        <Card className="resource-chart-card">
+          <CardHeader>
+            <CardTitle>Biểu đồ sử dụng tài nguyên</CardTitle>
+            <div className="chart-controls">
+              <div className="chart-type-selector">
+                <button 
+                  className={`chart-type-btn ${chartType === 'line' ? 'active' : ''}`}
+                  onClick={() => setChartType('line')}
+                >
+                  <i className="fas fa-chart-line"></i>
+                </button>
+                <button 
+                  className={`chart-type-btn ${chartType === 'area' ? 'active' : ''}`}
+                  onClick={() => setChartType('area')}
+                >
+                  <i className="fas fa-chart-area"></i>
+                </button>
+                <button 
+                  className={`chart-type-btn ${chartType === 'bar' ? 'active' : ''}`}
+                  onClick={() => setChartType('bar')}
+                >
+                  <i className="fas fa-chart-bar"></i>
+                </button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="resource-tabs-container">
+              <Tabs 
+                tabs={resourceTabs}
+                activeTab={selectedResource}
+                onChange={setSelectedResource}
+              />
+              
+              <div className="chart-container">
+                {renderChart()}
+              </div>
+              
+              <div className="vm-selector">
+                <h4>Chọn máy ảo để xem chi tiết:</h4>
+                <div className="vm-checkboxes">
+                  {vms.map((vm) => (
+                    <label key={vm.id} className="vm-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedVMs.includes(vm.id)}
+                        onChange={() => handleVMToggle(vm.id)}
+                      />
+                      <span className={`status-indicator ${vm.status}`}></span>
+                      {vm.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="resource-insights">
+          <Card className="insights-card">
+            <CardHeader>
+              <CardTitle>Phân tích tài nguyên</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="insights-list">
+                {dashboardData.resourceInsights.map((insight, index) => (
+                  <div key={index} className={`insight-item ${insight.type}`}>
+                    <div className="insight-icon">
+                      <i className={`fas fa-${
+                        insight.type === 'alert' 
+                          ? 'exclamation-circle' 
+                          : insight.type === 'warning' 
+                          ? 'exclamation-triangle' 
+                          : 'lightbulb'
+                      }`}></i>
+                    </div>
+                    <div className="insight-content">
+                      <h4 className="insight-title">{insight.title}</h4>
+                      <p className="insight-description">{insight.description}</p>
+                      {insight.recommendation && (
+                        <p className="insight-recommendation">
+                          <strong>Khuyến nghị:</strong> {insight.recommendation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {dashboardData.resourceInsights.length === 0 && (
+                  <div className="empty-insights">
+                    <i className="fas fa-check-circle"></i>
+                    <p>Không có phân tích đáng chú ý.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </Card>
+    </section>
   );
 };
 

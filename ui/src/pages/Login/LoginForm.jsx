@@ -1,105 +1,155 @@
-import { useState } from 'react';
-import { Form, Input, Button, Checkbox, Tooltip } from 'antd';
-import { UserOutlined, LockOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import useAuth from '../../hooks/useAuth';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks';
 
 /**
- * Login form component
+ * Component form đăng nhập
+ * 
+ * @returns {JSX.Element} Component form đăng nhập
  */
 const LoginForm = () => {
-  const [form] = Form.useForm();
-  const { login, loading, error } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [formErrors, setFormErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const { login, loading, error } = useAuth();
+  const navigate = useNavigate();
 
   /**
-   * Handle form submission
-   * @param {Object} values - Form values
+   * Xác thực form đăng nhập
+   * 
+   * @returns {boolean} Kết quả xác thực
    */
-  const onFinish = async (values) => {
-    const { username, password, remember } = values;
-    
-    // Save username to localStorage if remember is checked
-    if (remember) {
-      localStorage.setItem('rememberedUsername', username);
-    } else {
-      localStorage.removeItem('rememberedUsername');
+  const validateForm = () => {
+    const errors = {};
+    let isValid = true;
+
+    if (!username.trim()) {
+      errors.username = 'Vui lòng nhập tên đăng nhập';
+      isValid = false;
     }
-    
-    await login(username, password);
+
+    if (!password) {
+      errors.password = 'Vui lòng nhập mật khẩu';
+      isValid = false;
+    } else if (password.length < 6) {
+      errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
   };
 
-  // Get remembered username from localStorage
-  const rememberedUsername = localStorage.getItem('rememberedUsername');
+  /**
+   * Xử lý đăng nhập khi submit form
+   * 
+   * @param {Event} e - Sự kiện submit form
+   */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      await login(username, password);
+      // Nếu đăng nhập thành công, useAuth sẽ tự động cập nhật trạng thái
+      // và component Login sẽ chuyển hướng
+    } catch (err) {
+      // Lỗi đã được xử lý trong hook useAuth
+      console.log('Login error:', err);
+    }
+  };
+
+  /**
+   * Hiển thị hoặc ẩn mật khẩu
+   */
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   return (
-    <Form
-      form={form}
-      name="login"
-      initialValues={{ 
-        remember: !!rememberedUsername,
-        username: rememberedUsername || '' 
-      }}
-      onFinish={onFinish}
-      size="large"
-      layout="vertical"
-    >
-      <Form.Item
-        name="username"
-        label="Tên đăng nhập"
-        rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập!' }]}
-      >
-        <Input 
-          prefix={<UserOutlined className="site-form-item-icon" />} 
-          placeholder="Username" 
-          autoComplete="username"
-        />
-      </Form.Item>
-
-      <Form.Item
-        name="password"
-        label="Mật khẩu"
-        rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
-        extra={
-          <Tooltip title="Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số">
-            <QuestionCircleOutlined /> Yêu cầu mật khẩu
-          </Tooltip>
-        }
-      >
-        <Input.Password
-          prefix={<LockOutlined className="site-form-item-icon" />}
-          type={showPassword ? "text" : "password"}
-          placeholder="Password"
-          autoComplete="current-password"
-          visibilityToggle={{ visible: showPassword, onVisibleChange: setShowPassword }}
-        />
-      </Form.Item>
-
-      {error && (
-        <div style={{ color: '#ff4d4f', marginBottom: 24 }}>
-          {error}
+    <form className="login-form" onSubmit={handleSubmit} noValidate>
+      <div className="form-group">
+        <label htmlFor="username">Tên đăng nhập</label>
+        <div className="input-wrapper">
+          <span className="input-icon">
+            <i className="fas fa-user"></i>
+          </span>
+          <input
+            type="text"
+            id="username"
+            className={`form-control ${formErrors.username ? 'is-invalid' : ''}`}
+            placeholder="Nhập tên đăng nhập"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            disabled={loading}
+          />
         </div>
-      )}
+        {formErrors.username && (
+          <div className="error-message">{formErrors.username}</div>
+        )}
+      </div>
 
-      <Form.Item>
-        <Form.Item name="remember" valuePropName="checked" noStyle>
-          <Checkbox>Ghi nhớ đăng nhập</Checkbox>
-        </Form.Item>
-        <a href="#forgot-password" className="login-form-forgot">
-          Quên mật khẩu?
-        </a>
-      </Form.Item>
+      <div className="form-group">
+        <label htmlFor="password">Mật khẩu</label>
+        <div className="input-wrapper">
+          <span className="input-icon">
+            <i className="fas fa-lock"></i>
+          </span>
+          <input
+            type={showPassword ? 'text' : 'password'}
+            id="password"
+            className={`form-control ${formErrors.password ? 'is-invalid' : ''}`}
+            placeholder="Nhập mật khẩu"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+          />
+          <button
+            type="button"
+            className="password-toggle"
+            onClick={togglePasswordVisibility}
+          >
+            <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+          </button>
+        </div>
+        {formErrors.password && (
+          <div className="error-message">{formErrors.password}</div>
+        )}
+      </div>
 
-      <Form.Item>
-        <Button 
-          type="primary" 
-          htmlType="submit" 
-          loading={loading}
-          className="login-form-button"
-        >
-          Đăng nhập
-        </Button>
-      </Form.Item>
-    </Form>
+      {error && <div className="alert alert-danger">{error}</div>}
+
+      <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+        {loading ? (
+          <>
+            <span className="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
+            Đang đăng nhập...
+          </>
+        ) : (
+          'Đăng nhập'
+        )}
+      </button>
+
+      <div className="social-login">
+        <div className="divider">
+          <span>Hoặc đăng nhập với</span>
+        </div>
+        <div className="social-buttons">
+          <button type="button" className="btn btn-social btn-google">
+            <i className="fab fa-google"></i>
+            Google
+          </button>
+          <button type="button" className="btn btn-social btn-github">
+            <i className="fab fa-github"></i>
+            GitHub
+          </button>
+        </div>
+      </div>
+    </form>
   );
 };
 

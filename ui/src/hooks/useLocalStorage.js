@@ -1,68 +1,179 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 /**
- * Hook to use localStorage with state
+ * Hook để tương tác với localStorage an toàn và thuận tiện
  * 
- * @param {string} key - localStorage key
- * @param {*} initialValue - Initial value
- * @returns {Array} - [storedValue, setValue]
+ * @returns {Object} Các phương thức và trạng thái liên quan đến localStorage
  */
-export const useLocalStorage = (key, initialValue) => {
-  // State to store our value
-  const [storedValue, setStoredValue] = useState(() => {
-    try {
-      // Get from local storage by key
-      const item = window.localStorage.getItem(key);
-      // Parse stored json or if none return initialValue
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      // If error also return initialValue
-      console.error(`Error reading localStorage key "${key}":`, error);
-      return initialValue;
-    }
-  });
+export const useLocalStorage = () => {
+  const [error, setError] = useState(null);
 
-  // Return a wrapped version of useState's setter function that
-  // persists the new value to localStorage
-  const setValue = (value) => {
+  /**
+   * Lấy giá trị từ localStorage
+   * 
+   * @param {string} key - Khóa lưu trữ
+   * @param {*} defaultValue - Giá trị mặc định nếu không tìm thấy khóa
+   * @returns {*} Giá trị được lưu trữ hoặc giá trị mặc định
+   */
+  const getItem = (key, defaultValue = null) => {
     try {
-      // Allow value to be a function so we have the same API as useState
-      const valueToStore =
-        value instanceof Function ? value(storedValue) : value;
+      const item = localStorage.getItem(key);
       
-      // Save state
-      setStoredValue(valueToStore);
+      if (item === null) {
+        return defaultValue;
+      }
       
-      // Save to local storage
-      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      try {
+        // Thử parse dữ liệu JSON
+        return JSON.parse(item);
+      } catch (e) {
+        // Nếu không phải JSON, trả về string
+        return item;
+      }
     } catch (error) {
-      // A more advanced implementation would handle the error case
-      console.error(`Error setting localStorage key "${key}":`, error);
+      console.error(`Error getting item ${key} from localStorage:`, error);
+      setError(error);
+      return defaultValue;
     }
   };
 
-  // Listen for changes to this localStorage key in other tabs/windows
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === key && e.newValue !== null) {
-        try {
-          setStoredValue(JSON.parse(e.newValue));
-        } catch (error) {
-          console.error(`Error parsing localStorage value:`, error);
-        }
+  /**
+   * Lưu giá trị vào localStorage
+   * 
+   * @param {string} key - Khóa lưu trữ
+   * @param {*} value - Giá trị cần lưu
+   * @returns {boolean} True nếu thành công, false nếu thất bại
+   */
+  const setItem = (key, value) => {
+    try {
+      // Chuyển đổi dữ liệu phức tạp thành JSON string
+      const valueToStore = typeof value === 'object' 
+        ? JSON.stringify(value) 
+        : String(value);
+      
+      localStorage.setItem(key, valueToStore);
+      return true;
+    } catch (error) {
+      console.error(`Error setting item ${key} in localStorage:`, error);
+      setError(error);
+      return false;
+    }
+  };
+
+  /**
+   * Xóa một mục khỏi localStorage
+   * 
+   * @param {string} key - Khóa cần xóa
+   * @returns {boolean} True nếu thành công, false nếu thất bại
+   */
+  const removeItem = (key) => {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.error(`Error removing item ${key} from localStorage:`, error);
+      setError(error);
+      return false;
+    }
+  };
+
+  /**
+   * Xóa tất cả dữ liệu trong localStorage
+   * 
+   * @returns {boolean} True nếu thành công, false nếu thất bại
+   */
+  const clear = () => {
+    try {
+      localStorage.clear();
+      return true;
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+      setError(error);
+      return false;
+    }
+  };
+
+  /**
+   * Kiểm tra xem khóa có tồn tại trong localStorage hay không
+   * 
+   * @param {string} key - Khóa cần kiểm tra
+   * @returns {boolean} True nếu khóa tồn tại, false nếu không
+   */
+  const hasItem = (key) => {
+    try {
+      return localStorage.getItem(key) !== null;
+    } catch (error) {
+      console.error(`Error checking key ${key} in localStorage:`, error);
+      setError(error);
+      return false;
+    }
+  };
+
+  /**
+   * Lấy tất cả các khóa trong localStorage
+   * 
+   * @returns {Array<string>} Danh sách các khóa
+   */
+  const getKeys = () => {
+    try {
+      return Object.keys(localStorage);
+    } catch (error) {
+      console.error('Error getting keys from localStorage:', error);
+      setError(error);
+      return [];
+    }
+  };
+
+  /**
+   * Lấy kích thước hiện tại của localStorage (bytes)
+   * 
+   * @returns {number} Kích thước tính bằng bytes
+   */
+  const getSize = () => {
+    try {
+      let totalSize = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        totalSize += (key.length + value.length) * 2; // UTF-16 uses 2 bytes per character
       }
-    };
+      return totalSize;
+    } catch (error) {
+      console.error('Error calculating localStorage size:', error);
+      setError(error);
+      return 0;
+    }
+  };
 
-    // Add event listener
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Remove event listener on cleanup
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [key]);
+  /**
+   * Kiểm tra localStorage có khả dụng hay không
+   * 
+   * @returns {boolean} True nếu localStorage khả dụng
+   */
+  const isAvailable = () => {
+    try {
+      const testKey = `_test_${Date.now()}`;
+      localStorage.setItem(testKey, 'test');
+      localStorage.removeItem(testKey);
+      return true;
+    } catch (error) {
+      console.error('localStorage is not available:', error);
+      setError(error);
+      return false;
+    }
+  };
 
-  return [storedValue, setValue];
+  return {
+    getItem,
+    setItem,
+    removeItem,
+    clear,
+    hasItem,
+    getKeys,
+    getSize,
+    isAvailable,
+    error
+  };
 };
 
 export default useLocalStorage;

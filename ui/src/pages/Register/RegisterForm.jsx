@@ -1,234 +1,486 @@
-import { useState } from 'react';
-import { Form, Input, Button, Select, Checkbox, Tooltip, Divider } from 'antd';
-import { 
-  UserOutlined, 
-  LockOutlined, 
-  MailOutlined, 
-  PhoneOutlined,
-  QuestionCircleOutlined,
-  InfoCircleOutlined
-} from '@ant-design/icons';
-import useAuth from '../../hooks/useAuth';
-
-const { Option } = Select;
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth, useNotification } from '../../hooks';
 
 /**
- * Register form component
+ * Component form đăng ký
+ * 
+ * @returns {JSX.Element} Component form đăng ký
  */
 const RegisterForm = () => {
-  const [form] = Form.useForm();
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    username: '',
+    password: '',
+    confirmPassword: '',
+    company: '',
+    jobTitle: '',
+    agreeTerms: false
+  });
+  const [formErrors, setFormErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [step, setStep] = useState(1);
   const { register, loading, error } = useAuth();
-  const [passwordVisible, setPasswordVisible] = useState(false);
+  const { showSuccess } = useNotification();
+  const navigate = useNavigate();
 
   /**
-   * Handle form submission
-   * @param {Object} values - Form values
+   * Cập nhật giá trị form khi người dùng nhập
+   * 
+   * @param {Event} e - Sự kiện change của input
    */
-  const onFinish = async (values) => {
-    // Remove confirmPassword field
-    const { confirmPassword, ...userData } = values;
-    await register(userData);
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+
+    // Xóa lỗi khi người dùng bắt đầu sửa trường đó
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: null
+      }));
+    }
   };
 
   /**
-   * Check if password is strong enough
-   * @param {string} password - Password to check
-   * @returns {boolean} - True if password is strong
+   * Xác thực form đăng ký cho bước 1
+   * 
+   * @returns {boolean} Kết quả xác thực
    */
-  const validatePasswordStrength = (_, value) => {
-    if (!value) {
-      return Promise.reject(new Error('Vui lòng nhập mật khẩu!'));
+  const validateStep1 = () => {
+    const errors = {};
+    let isValid = true;
+
+    if (!formData.fullName.trim()) {
+      errors.fullName = 'Vui lòng nhập họ và tên';
+      isValid = false;
     }
-    
-    // Password needs to be at least 8 characters
-    if (value.length < 8) {
-      return Promise.reject(new Error('Mật khẩu phải có ít nhất 8 ký tự!'));
+
+    if (!formData.email.trim()) {
+      errors.email = 'Vui lòng nhập email';
+      isValid = false;
+    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
+      errors.email = 'Email không hợp lệ';
+      isValid = false;
     }
-    
-    // Password needs to contain at least one uppercase letter, one lowercase letter, and one number
-    const hasUpperCase = /[A-Z]/.test(value);
-    const hasLowerCase = /[a-z]/.test(value);
-    const hasNumber = /\d/.test(value);
-    
-    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
-      return Promise.reject(
-        new Error('Mật khẩu phải có ít nhất 1 chữ hoa, 1 chữ thường và 1 số!')
+
+    if (!formData.username.trim()) {
+      errors.username = 'Vui lòng nhập tên đăng nhập';
+      isValid = false;
+    } else if (formData.username.length < 4) {
+      errors.username = 'Tên đăng nhập phải có ít nhất 4 ký tự';
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
+
+  /**
+   * Xác thực form đăng ký cho bước 2
+   * 
+   * @returns {boolean} Kết quả xác thực
+   */
+  const validateStep2 = () => {
+    const errors = {};
+    let isValid = true;
+
+    if (!formData.password) {
+      errors.password = 'Vui lòng nhập mật khẩu';
+      isValid = false;
+    } else if (formData.password.length < 8) {
+      errors.password = 'Mật khẩu phải có ít nhất 8 ký tự';
+      isValid = false;
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      errors.password = 'Mật khẩu phải bao gồm chữ hoa, chữ thường và số';
+      isValid = false;
+    }
+
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Vui lòng xác nhận mật khẩu';
+      isValid = false;
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+      isValid = false;
+    }
+
+    if (!formData.agreeTerms) {
+      errors.agreeTerms = 'Bạn phải đồng ý với điều khoản dịch vụ';
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
+
+  /**
+   * Xử lý chuyển sang bước tiếp theo
+   */
+  const handleNextStep = () => {
+    if (validateStep1()) {
+      setStep(2);
+    }
+  };
+
+  /**
+   * Xử lý quay lại bước trước
+   */
+  const handlePrevStep = () => {
+    setStep(1);
+  };
+
+  /**
+   * Xử lý đăng ký khi submit form
+   * 
+   * @param {Event} e - Sự kiện submit form
+   */
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (step === 1) {
+      handleNextStep();
+      return;
+    }
+
+    if (!validateStep2()) {
+      return;
+    }
+
+    try {
+      await register(formData);
+      showSuccess(
+        'Đăng ký thành công',
+        'Tài khoản của bạn đã được tạo, vui lòng đăng nhập để tiếp tục.'
       );
+      navigate('/login');
+    } catch (err) {
+      // Lỗi đã được xử lý trong hook useAuth
+      console.log('Registration error:', err);
     }
-    
-    return Promise.resolve();
+  };
+
+  /**
+   * Hiển thị hoặc ẩn mật khẩu
+   */
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
+  /**
+   * Hiển thị hoặc ẩn mật khẩu xác nhận
+   */
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
   };
 
   return (
-    <Form
-      form={form}
-      name="register"
-      onFinish={onFinish}
-      layout="vertical"
-      scrollToFirstError
-    >
-      <Form.Item
-        name="username"
-        label="Tên đăng nhập"
-        rules={[
-          { required: true, message: 'Vui lòng nhập tên đăng nhập!' },
-          { min: 3, message: 'Tên đăng nhập phải có ít nhất 3 ký tự!' },
-          { max: 20, message: 'Tên đăng nhập không được vượt quá 20 ký tự!' },
-          {
-            pattern: /^[a-zA-Z0-9_]+$/,
-            message: 'Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới!',
-          },
-        ]}
-      >
-        <Input
-          prefix={<UserOutlined />}
-          placeholder="Username"
-          autoComplete="username"
-        />
-      </Form.Item>
+    <form className="register-form" onSubmit={handleSubmit} noValidate>
+      {step === 1 ? (
+        // Step 1: Thông tin cơ bản
+        <>
+          <div className="form-group">
+            <label htmlFor="fullName">Họ và tên</label>
+            <div className="input-wrapper">
+              <span className="input-icon">
+                <i className="fas fa-user"></i>
+              </span>
+              <input
+                type="text"
+                id="fullName"
+                name="fullName"
+                className={`form-control ${formErrors.fullName ? 'is-invalid' : ''}`}
+                placeholder="Nhập họ và tên của bạn"
+                value={formData.fullName}
+                onChange={handleChange}
+                disabled={loading}
+              />
+            </div>
+            {formErrors.fullName && (
+              <div className="error-message">{formErrors.fullName}</div>
+            )}
+          </div>
 
-      <Form.Item
-        name="email"
-        label="Email"
-        rules={[
-          { required: true, message: 'Vui lòng nhập email!' },
-          { type: 'email', message: 'Email không hợp lệ!' },
-        ]}
-      >
-        <Input
-          prefix={<MailOutlined />}
-          placeholder="Email"
-          autoComplete="email"
-        />
-      </Form.Item>
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <div className="input-wrapper">
+              <span className="input-icon">
+                <i className="fas fa-envelope"></i>
+              </span>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                className={`form-control ${formErrors.email ? 'is-invalid' : ''}`}
+                placeholder="Nhập địa chỉ email của bạn"
+                value={formData.email}
+                onChange={handleChange}
+                disabled={loading}
+              />
+            </div>
+            {formErrors.email && (
+              <div className="error-message">{formErrors.email}</div>
+            )}
+          </div>
 
-      <Form.Item
-        name="name"
-        label="Họ và tên"
-        rules={[{ required: true, message: 'Vui lòng nhập họ và tên!' }]}
-      >
-        <Input
-          prefix={<UserOutlined />}
-          placeholder="Họ và tên"
-          autoComplete="name"
-        />
-      </Form.Item>
+          <div className="form-group">
+            <label htmlFor="username">Tên đăng nhập</label>
+            <div className="input-wrapper">
+              <span className="input-icon">
+                <i className="fas fa-at"></i>
+              </span>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                className={`form-control ${formErrors.username ? 'is-invalid' : ''}`}
+                placeholder="Tạo tên đăng nhập"
+                value={formData.username}
+                onChange={handleChange}
+                disabled={loading}
+              />
+            </div>
+            {formErrors.username && (
+              <div className="error-message">{formErrors.username}</div>
+            )}
+          </div>
 
-      <Form.Item
-        name="phone"
-        label="Số điện thoại"
-        rules={[
-          { required: true, message: 'Vui lòng nhập số điện thoại!' },
-          {
-            pattern: /^[0-9]{10,11}$/,
-            message: 'Số điện thoại không hợp lệ!',
-          },
-        ]}
-      >
-        <Input
-          prefix={<PhoneOutlined />}
-          placeholder="Số điện thoại"
-          autoComplete="tel"
-        />
-      </Form.Item>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="company">Công ty (Không bắt buộc)</label>
+              <div className="input-wrapper">
+                <span className="input-icon">
+                  <i className="fas fa-building"></i>
+                </span>
+                <input
+                  type="text"
+                  id="company"
+                  name="company"
+                  className="form-control"
+                  placeholder="Tên công ty"
+                  value={formData.company}
+                  onChange={handleChange}
+                  disabled={loading}
+                />
+              </div>
+            </div>
 
-      <Divider orientation="left">Thông tin tài khoản</Divider>
+            <div className="form-group">
+              <label htmlFor="jobTitle">Chức danh (Không bắt buộc)</label>
+              <div className="input-wrapper">
+                <span className="input-icon">
+                  <i className="fas fa-briefcase"></i>
+                </span>
+                <input
+                  type="text"
+                  id="jobTitle"
+                  name="jobTitle"
+                  className="form-control"
+                  placeholder="Vị trí công việc"
+                  value={formData.jobTitle}
+                  onChange={handleChange}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          </div>
 
-      <Form.Item
-        name="password"
-        label="Mật khẩu"
-        rules={[
-          { validator: validatePasswordStrength },
-        ]}
-        tooltip={{
-          title: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số',
-          icon: <InfoCircleOutlined />,
-        }}
-      >
-        <Input.Password
-          prefix={<LockOutlined />}
-          placeholder="Mật khẩu"
-          autoComplete="new-password"
-          visibilityToggle={{ visible: passwordVisible, onVisibleChange: setPasswordVisible }}
-        />
-      </Form.Item>
+          <button
+            type="button"
+            className="btn btn-primary btn-block"
+            onClick={handleNextStep}
+            disabled={loading}
+          >
+            Tiếp theo
+          </button>
+        </>
+      ) : (
+        // Step 2: Thông tin bảo mật
+        <>
+          <div className="form-group">
+            <label htmlFor="password">Mật khẩu</label>
+            <div className="input-wrapper">
+              <span className="input-icon">
+                <i className="fas fa-lock"></i>
+              </span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                className={`form-control ${formErrors.password ? 'is-invalid' : ''}`}
+                placeholder="Tạo mật khẩu"
+                value={formData.password}
+                onChange={handleChange}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={togglePasswordVisibility}
+              >
+                <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+              </button>
+            </div>
+            {formErrors.password && (
+              <div className="error-message">{formErrors.password}</div>
+            )}
+            <div className="password-strength">
+              <div className="strength-meter">
+                <div
+                  className={`strength-meter-fill ${
+                    formData.password.length > 0
+                      ? formData.password.length < 8
+                        ? 'weak'
+                        : /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)
+                        ? 'strong'
+                        : 'medium'
+                      : ''
+                  }`}
+                  style={{
+                    width: formData.password.length > 0
+                      ? formData.password.length < 8
+                        ? '30%'
+                        : /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)
+                        ? '100%'
+                        : '60%'
+                      : '0%'
+                  }}
+                ></div>
+              </div>
+              <div className="strength-text">
+                {formData.password.length > 0 && (
+                  <span className={
+                    formData.password.length < 8
+                      ? 'weak'
+                      : /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)
+                      ? 'strong'
+                      : 'medium'
+                  }>
+                    {formData.password.length < 8
+                      ? 'Yếu'
+                      : /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)
+                      ? 'Mạnh'
+                      : 'Trung bình'}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="password-hints">
+              <p>Mật khẩu phải đáp ứng các điều kiện sau:</p>
+              <ul>
+                <li className={formData.password.length >= 8 ? 'valid' : ''}>
+                  <i className={`fas ${formData.password.length >= 8 ? 'fa-check' : 'fa-times'}`}></i>
+                  Ít nhất 8 ký tự
+                </li>
+                <li className={/[A-Z]/.test(formData.password) ? 'valid' : ''}>
+                  <i className={`fas ${/[A-Z]/.test(formData.password) ? 'fa-check' : 'fa-times'}`}></i>
+                  Ít nhất một chữ hoa
+                </li>
+                <li className={/[a-z]/.test(formData.password) ? 'valid' : ''}>
+                  <i className={`fas ${/[a-z]/.test(formData.password) ? 'fa-check' : 'fa-times'}`}></i>
+                  Ít nhất một chữ thường
+                </li>
+                <li className={/\d/.test(formData.password) ? 'valid' : ''}>
+                  <i className={`fas ${/\d/.test(formData.password) ? 'fa-check' : 'fa-times'}`}></i>
+                  Ít nhất một chữ số
+                </li>
+              </ul>
+            </div>
+          </div>
 
-      <Form.Item
-        name="confirmPassword"
-        label="Xác nhận mật khẩu"
-        dependencies={['password']}
-        rules={[
-          { required: true, message: 'Vui lòng xác nhận mật khẩu!' },
-          ({ getFieldValue }) => ({
-            validator(_, value) {
-              if (!value || getFieldValue('password') === value) {
-                return Promise.resolve();
-              }
-              return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
-            },
-          }),
-        ]}
-      >
-        <Input.Password
-          prefix={<LockOutlined />}
-          placeholder="Xác nhận mật khẩu"
-          autoComplete="new-password"
-        />
-      </Form.Item>
+          <div className="form-group">
+            <label htmlFor="confirmPassword">Xác nhận mật khẩu</label>
+            <div className="input-wrapper">
+              <span className="input-icon">
+                <i className="fas fa-lock"></i>
+              </span>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                id="confirmPassword"
+                name="confirmPassword"
+                className={`form-control ${formErrors.confirmPassword ? 'is-invalid' : ''}`}
+                placeholder="Nhập lại mật khẩu"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={toggleConfirmPasswordVisibility}
+              >
+                <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+              </button>
+            </div>
+            {formErrors.confirmPassword && (
+              <div className="error-message">{formErrors.confirmPassword}</div>
+            )}
+          </div>
 
-      <Form.Item
-        name="role"
-        label={
-          <span>
-            Vai trò{' '}
-            <Tooltip title="Vai trò của bạn trong hệ thống">
-              <QuestionCircleOutlined />
-            </Tooltip>
-          </span>
-        }
-        initialValue="user"
-      >
-        <Select placeholder="Chọn vai trò">
-          <Option value="user">Người dùng</Option>
-          <Option value="admin">Quản trị viên</Option>
-        </Select>
-      </Form.Item>
+          <div className="form-group checkbox-group">
+            <div className="custom-checkbox">
+              <input
+                type="checkbox"
+                id="agreeTerms"
+                name="agreeTerms"
+                checked={formData.agreeTerms}
+                onChange={handleChange}
+                disabled={loading}
+              />
+              <label htmlFor="agreeTerms">
+                Tôi đồng ý với <a href="/terms" target="_blank" rel="noopener noreferrer">Điều khoản dịch vụ</a> và <a href="/privacy" target="_blank" rel="noopener noreferrer">Chính sách bảo mật</a>
+              </label>
+            </div>
+            {formErrors.agreeTerms && (
+              <div className="error-message">{formErrors.agreeTerms}</div>
+            )}
+          </div>
 
-      <Form.Item
-        name="agreement"
-        valuePropName="checked"
-        rules={[
-          {
-            validator: (_, value) =>
-              value
-                ? Promise.resolve()
-                : Promise.reject(new Error('Vui lòng đọc và đồng ý với điều khoản sử dụng!')),
-          },
-        ]}
-      >
-        <Checkbox>
-          Tôi đã đọc và đồng ý với <a href="#">Điều khoản sử dụng</a> và{' '}
-          <a href="#">Chính sách bảo mật</a>
-        </Checkbox>
-      </Form.Item>
+          {error && <div className="alert alert-danger">{error}</div>}
 
-      {error && (
-        <div style={{ color: '#ff4d4f', marginBottom: 24 }}>
-          {error}
-        </div>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              onClick={handlePrevStep}
+              disabled={loading}
+            >
+              Quay lại
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>
+                  Đang đăng ký...
+                </>
+              ) : (
+                'Đăng ký'
+              )}
+            </button>
+          </div>
+        </>
       )}
 
-      <Form.Item>
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={loading}
-          className="login-form-button"
-        >
-          Đăng ký
-        </Button>
-      </Form.Item>
-    </Form>
+      <div className="social-register">
+        <div className="divider">
+          <span>Hoặc đăng ký với</span>
+        </div>
+        <div className="social-buttons">
+          <button type="button" className="btn btn-social btn-google">
+            <i className="fab fa-google"></i>
+            Google
+          </button>
+          <button type="button" className="btn btn-social btn-github">
+            <i className="fab fa-github"></i>
+            GitHub
+          </button>
+        </div>
+      </div>
+    </form>
   );
 };
 
