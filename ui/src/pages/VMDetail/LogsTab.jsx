@@ -1,348 +1,343 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useVM } from '../../hooks';
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '../../components/common';
+import { Card } from '../../components/common/Card';
+import { Button } from '../../components/common/Button';
+import { Spinner } from '../../components/common/Spinner';
+import { ErrorState } from '../../components/common/ErrorState';
+import { Search } from '../../components/common/Search';
+import { EmptyState } from '../../components/common/EmptyState';
+import { VMLogViewer } from '../../components/vm/VMLogViewer';
+import { useVM } from '../../hooks/useVM';
+import { formatDate } from '../../utils/format.utils';
 
-/**
- * Component tab logs máy ảo
- * 
- * @param {Object} props - Props component
- * @param {Object} props.vm - Thông tin máy ảo
- * @returns {JSX.Element} Component tab logs
- */
-const LogsTab = ({ vm }) => {
-  const { fetchVMLogs } = useVM();
+const LogsTab = ({ vmId }) => {
+  const { getVMLogs, loading, error } = useVM();
+  
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [logType, setLogType] = useState('system');
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [limit, setLimit] = useState(100);
-  const [searchTerm, setSearchTerm] = useState('');
   const [filteredLogs, setFilteredLogs] = useState([]);
-  const logContainerRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLogType, setSelectedLogType] = useState('system');
+  const [timeRange, setTimeRange] = useState('1d');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isAutoRefresh, setIsAutoRefresh] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+  
   const autoRefreshIntervalRef = useRef(null);
-
-  // Tải logs khi component mount hoặc các tham số thay đổi
-  useEffect(() => {
-    loadLogs();
-    
-    // Thiết lập interval nếu autoRefresh được bật
-    if (autoRefresh) {
-      autoRefreshIntervalRef.current = setInterval(() => {
-        loadLogs(false); // Không hiển thị loading để tránh nhấp nháy UI
-      }, 10000); // Làm mới mỗi 10 giây
+  const logsPerPage = 100;
+  
+  // Log types available for selection
+  const logTypes = [
+    { id: 'system', label: 'System Logs' },
+    { id: 'application', label: 'Application Logs' },
+    { id: 'security', label: 'Security Logs' },
+    { id: 'ssh', label: 'SSH Logs' }
+  ];
+  
+  // Time range options
+  const timeRangeOptions = [
+    { id: '1h', label: 'Last Hour' },
+    { id: '6h', label: 'Last 6 Hours' },
+    { id: '1d', label: 'Last Day' },
+    { id: '7d', label: 'Last Week' },
+    { id: '30d', label: 'Last Month' }
+  ];
+  
+  // Log severity classes for styling
+  const getSeverityClass = (severity) => {
+    switch (severity.toLowerCase()) {
+      case 'error':
+        return 'log-severity-error';
+      case 'warning':
+        return 'log-severity-warning';
+      case 'info':
+        return 'log-severity-info';
+      case 'debug':
+        return 'log-severity-debug';
+      default:
+        return '';
+    }
+  };
+  
+  // Fetch logs based on current filters
+  const fetchLogs = async () => {
+    try {
+      const logsData = await getVMLogs(vmId, {
+        logType: selectedLogType,
+        timeRange: timeRange,
+        page: page,
+        limit: logsPerPage
+      });
+      
+      setLogs(logsData.logs);
+      setTotalPages(Math.ceil(logsData.total / logsPerPage));
+      
+      // Apply search filter if active
+      if (searchTerm) {
+        filterLogs(logsData.logs, searchTerm);
+      } else {
+        setFilteredLogs(logsData.logs);
+      }
+    } catch (err) {
+      console.error('Error fetching VM logs:', err);
+    }
+  };
+  
+  // Handle log filtering by search term
+  const filterLogs = (logsToFilter, term) => {
+    if (!term) {
+      setFilteredLogs(logsToFilter);
+      setSearchActive(false);
+      return;
     }
     
-    // Cleanup interval khi component unmount hoặc autoRefresh thay đổi
+    const filtered = logsToFilter.filter(log => 
+      log.message.toLowerCase().includes(term.toLowerCase()) ||
+      log.severity.toLowerCase().includes(term.toLowerCase())
+    );
+    
+    setFilteredLogs(filtered);
+    setSearchActive(true);
+  };
+  
+  // Initial fetch and setup auto-refresh if enabled
+  useEffect(() => {
+    fetchLogs();
+    
+    // Setup auto-refresh
+    if (isAutoRefresh) {
+      autoRefreshIntervalRef.current = setInterval(() => {
+        fetchLogs();
+      }, 10000); // Refresh every 10 seconds
+    }
+    
     return () => {
       if (autoRefreshIntervalRef.current) {
         clearInterval(autoRefreshIntervalRef.current);
       }
     };
-  }, [vm.id, logType, limit, autoRefresh]);
-
-  // Lọc logs khi searchTerm hoặc logs thay đổi
+  }, [vmId, selectedLogType, timeRange, page, isAutoRefresh]);
+  
+  // Handle search term changes
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredLogs(logs);
-      return;
-    }
-    
-    const filtered = logs.filter(log => 
-      log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.source.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    setFilteredLogs(filtered);
-  }, [searchTerm, logs]);
-
-  // Cuộn xuống cuối khi có logs mới và không đang tìm kiếm
-  useEffect(() => {
-    if (logContainerRef.current && !searchTerm && autoRefresh) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [filteredLogs, autoRefresh, searchTerm]);
-
-  /**
-   * Tải logs từ server
-   * 
-   * @param {boolean} showLoading - Có hiển thị trạng thái loading không
-   */
-  const loadLogs = async (showLoading = true) => {
-    if (showLoading) {
-      setLoading(true);
-    }
-    setError(null);
-    
-    try {
-      const logsData = await fetchVMLogs(vm.id, {
-        limit,
-        logType
-      });
-      
-      setLogs(logsData);
-    } catch (err) {
-      console.error('Error fetching logs:', err);
-      setError('Không thể tải logs. Vui lòng thử lại sau.');
-    } finally {
-      if (showLoading) {
-        setLoading(false);
-      }
-    }
+    filterLogs(logs, searchTerm);
+  }, [searchTerm]);
+  
+  // Handle log type change
+  const handleLogTypeChange = (type) => {
+    setSelectedLogType(type);
+    setPage(1);
   };
-
-  /**
-   * Làm mới logs
-   */
-  const handleRefresh = () => {
-    loadLogs();
+  
+  // Handle time range change
+  const handleTimeRangeChange = (range) => {
+    setTimeRange(range);
+    setPage(1);
   };
-
-  /**
-   * Xử lý khi thay đổi loại log
-   * 
-   * @param {Event} e - Sự kiện change
-   */
-  const handleLogTypeChange = (e) => {
-    setLogType(e.target.value);
+  
+  // Handle pagination
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
   };
-
-  /**
-   * Xử lý khi thay đổi giới hạn logs
-   * 
-   * @param {Event} e - Sự kiện change
-   */
-  const handleLimitChange = (e) => {
-    setLimit(Number(e.target.value));
+  
+  // Toggle auto-refresh
+  const toggleAutoRefresh = () => {
+    setIsAutoRefresh(prev => !prev);
   };
-
-  /**
-   * Xử lý khi thay đổi trạng thái tự động làm mới
-   */
-  const handleAutoRefreshToggle = () => {
-    setAutoRefresh(prev => !prev);
+  
+  // Handle search
+  const handleSearch = (term) => {
+    setSearchTerm(term);
   };
-
-  /**
-   * Xử lý khi thay đổi text tìm kiếm
-   * 
-   * @param {Event} e - Sự kiện change
-   */
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  /**
-   * Xóa text tìm kiếm
-   */
+  
+  // Clear search
   const clearSearch = () => {
     setSearchTerm('');
+    setSearchActive(false);
+    setFilteredLogs(logs);
   };
-
-  /**
-   * Lấy class CSS cho mức độ nghiêm trọng của log
-   * 
-   * @param {string} level - Mức độ nghiêm trọng
-   * @returns {string} Tên class CSS
-   */
-  const getLogLevelClass = (level) => {
-    switch (level.toLowerCase()) {
-      case 'error':
-        return 'error';
-      case 'warning':
-        return 'warning';
-      case 'info':
-        return 'info';
-      case 'debug':
-        return 'debug';
-      default:
-        return '';
-    }
+  
+  // Download logs
+  const downloadLogs = () => {
+    const logsToDownload = searchActive ? filteredLogs : logs;
+    const content = logsToDownload.map(log => 
+      `[${log.timestamp}] [${log.severity}] ${log.message}`
+    ).join('\n');
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${vmId}_${selectedLogType}_logs_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
-
-  /**
-   * Định dạng thời gian
-   * 
-   * @param {string} timestamp - Thời gian
-   * @returns {string} Thời gian đã định dạng
-   */
-  const formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
-
-  /**
-   * Tạo đường dẫn để tải về logs
-   * 
-   * @returns {string} Đường dẫn tải logs
-   */
-  const getDownloadUrl = () => {
-    return `/api/vms/${vm.id}/logs/download?type=${logType}&limit=${limit}`;
-  };
-
+  
+  // Loading state
+  if (loading && !logs.length) {
+    return (
+      <div className="logs-loading">
+        <Spinner />
+        <p>Loading logs...</p>
+      </div>
+    );
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <ErrorState 
+        title="Failed to load logs"
+        message={error.message}
+      />
+    );
+  }
+  
   return (
     <div className="logs-tab">
       <div className="logs-controls">
-        <div className="control-group">
-          <label htmlFor="log-type">Loại log:</label>
-          <select
-            id="log-type"
-            value={logType}
-            onChange={handleLogTypeChange}
-            className="log-type-select"
-          >
-            <option value="system">System</option>
-            <option value="application">Application</option>
-            <option value="security">Security</option>
-            <option value="all">Tất cả</option>
-          </select>
-        </div>
-        
-        <div className="control-group">
-          <label htmlFor="log-limit">Số lượng:</label>
-          <select
-            id="log-limit"
-            value={limit}
-            onChange={handleLimitChange}
-            className="log-limit-select"
-          >
-            <option value={50}>50 dòng</option>
-            <option value={100}>100 dòng</option>
-            <option value={200}>200 dòng</option>
-            <option value={500}>500 dòng</option>
-          </select>
-        </div>
-        
-        <div className="control-group auto-refresh">
-          <label htmlFor="auto-refresh">
-            <input
-              type="checkbox"
-              id="auto-refresh"
-              checked={autoRefresh}
-              onChange={handleAutoRefreshToggle}
-            />
-            <span>Tự động làm mới</span>
-          </label>
-        </div>
-        
-        <div className="control-actions">
-          <button 
-            className="refresh-btn"
-            onClick={handleRefresh}
-            disabled={loading}
-          >
-            <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i>
-            <span>Làm mới</span>
-          </button>
+        <div className="logs-filters">
+          <div className="log-type-filter">
+            <label>Log Type</label>
+            <div className="log-type-buttons">
+              {logTypes.map(type => (
+                <Button
+                  key={type.id}
+                  variant={selectedLogType === type.id ? 'primary' : 'outline'}
+                  size="small"
+                  onClick={() => handleLogTypeChange(type.id)}
+                >
+                  {type.label}
+                </Button>
+              ))}
+            </div>
+          </div>
           
-          <a 
-            href={getDownloadUrl()}
-            className="download-btn"
-            download
+          <div className="time-range-filter">
+            <label>Time Range</label>
+            <select 
+              value={timeRange}
+              onChange={(e) => handleTimeRangeChange(e.target.value)}
+              className="time-range-select"
+            >
+              {timeRangeOptions.map(option => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        <div className="logs-actions">
+          <Search 
+            placeholder="Search logs..."
+            value={searchTerm}
+            onChange={handleSearch}
+            onClear={clearSearch}
+          />
+          
+          <Button
+            variant="secondary"
+            icon={isAutoRefresh ? 'pause' : 'play'}
+            onClick={toggleAutoRefresh}
+            title={isAutoRefresh ? 'Pause auto-refresh' : 'Enable auto-refresh'}
           >
-            <i className="fas fa-download"></i>
-            <span>Tải về</span>
-          </a>
+            {isAutoRefresh ? 'Pause' : 'Auto-refresh'}
+          </Button>
+          
+          <Button
+            variant="secondary"
+            icon="download"
+            onClick={downloadLogs}
+            title="Download logs"
+          >
+            Download
+          </Button>
+          
+          <Button
+            variant="secondary"
+            icon="refresh"
+            onClick={fetchLogs}
+            title="Refresh logs"
+          >
+            Refresh
+          </Button>
         </div>
       </div>
       
-      <Card className="logs-card">
-        <CardHeader>
-          <CardTitle>
-            Logs 
-            {logType !== 'all' && <span className="log-type-badge">{logType}</span>}
-          </CardTitle>
-          <div className="search-container">
-            <div className="search-input-wrapper">
-              <i className="fas fa-search search-icon"></i>
-              <input
-                type="text"
-                placeholder="Tìm kiếm logs..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                className="search-input"
-              />
-              {searchTerm && (
-                <button
-                  className="clear-search-btn"
-                  onClick={clearSearch}
-                  aria-label="Xóa tìm kiếm"
-                >
-                  <i className="fas fa-times"></i>
-                </button>
-              )}
-            </div>
-            {searchTerm && (
-              <div className="search-result-count">
-                Tìm thấy {filteredLogs.length} kết quả
-              </div>
-            )}
+      <Card title={`${logTypes.find(t => t.id === selectedLogType)?.label} ${searchActive ? `- Search Results (${filteredLogs.length})` : ''}`}>
+        {loading && (
+          <div className="logs-refreshing">
+            <Spinner size="small" />
+            <span>Refreshing logs...</span>
           </div>
-        </CardHeader>
-        <CardContent className="logs-content">
-          {loading && logs.length === 0 ? (
-            <div className="logs-loading">
-              <Spinner size="medium" />
-              <p>Đang tải logs...</p>
-            </div>
-          ) : error ? (
-            <div className="logs-error">
-              <i className="fas fa-exclamation-circle"></i>
-              <p>{error}</p>
-              <button 
-                className="retry-btn"
-                onClick={handleRefresh}
-              >
-                Thử lại
-              </button>
-            </div>
-          ) : filteredLogs.length === 0 ? (
-            <div className="logs-empty">
-              <i className="fas fa-file-alt"></i>
-              <p>Không có logs nào</p>
-              {searchTerm ? (
-                <p className="hint">Không tìm thấy kết quả phù hợp. Thử tìm kiếm với từ khóa khác.</p>
-              ) : (
-                <p className="hint">Chưa có logs nào được ghi cho máy ảo này.</p>
-              )}
-            </div>
-          ) : (
-            <div className="logs-container" ref={logContainerRef}>
-              <table className="logs-table">
-                <thead>
-                  <tr>
-                    <th className="time-col">Thời gian</th>
-                    <th className="level-col">Mức độ</th>
-                    <th className="source-col">Nguồn</th>
-                    <th className="message-col">Nội dung</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.map((log, index) => (
-                    <tr key={index} className={getLogLevelClass(log.level)}>
-                      <td className="time-col">{formatTimestamp(log.timestamp)}</td>
-                      <td className="level-col">
-                        <span className={`level-badge ${getLogLevelClass(log.level)}`}>
-                          {log.level}
-                        </span>
-                      </td>
-                      <td className="source-col">{log.source}</td>
-                      <td className="message-col">{log.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
+        )}
+        
+        {(!filteredLogs || filteredLogs.length === 0) ? (
+          <EmptyState
+            title="No logs found"
+            message={
+              searchActive 
+                ? `No logs matching "${searchTerm}"`
+                : "No logs available for the selected time range"
+            }
+            action={
+              searchActive && (
+                <Button
+                  variant="text"
+                  onClick={clearSearch}
+                >
+                  Clear search
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <VMLogViewer logs={filteredLogs} />
+        )}
       </Card>
+      
+      {totalPages > 1 && (
+        <div className="logs-pagination">
+          <Button
+            variant="text"
+            disabled={page === 1}
+            onClick={() => handlePageChange(1)}
+          >
+            First
+          </Button>
+          
+          <Button
+            variant="text"
+            disabled={page === 1}
+            onClick={() => handlePageChange(page - 1)}
+          >
+            Previous
+          </Button>
+          
+          <span className="page-indicator">
+            Page {page} of {totalPages}
+          </span>
+          
+          <Button
+            variant="text"
+            disabled={page === totalPages}
+            onClick={() => handlePageChange(page + 1)}
+          >
+            Next
+          </Button>
+          
+          <Button
+            variant="text"
+            disabled={page === totalPages}
+            onClick={() => handlePageChange(totalPages)}
+          >
+            Last
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

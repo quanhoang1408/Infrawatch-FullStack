@@ -1,499 +1,390 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '../../components/common';
-import { PieChart } from '../../components/charts';
+import { Card } from '../../components/common/Card';
+import { Button } from '../../components/common/Button';
+import { Spinner } from '../../components/common/Spinner';
+import { ErrorState } from '../../components/common/ErrorState';
+import { Table } from '../../components/common/Table';
+import { Modal } from '../../components/common/Modal';
+import { StatusBadge } from '../../components/common/StatusBadge';
+import { useVM } from '../../hooks/useVM';
+import { useNotification } from '../../hooks/useNotification';
+import { formatBytes } from '../../utils/format.utils';
+import { PieChart } from '../../components/charts/PieChart';
 
-/**
- * Component tab thông tin lưu trữ máy ảo
- * 
- * @param {Object} props - Props component
- * @param {Object} props.vm - Thông tin máy ảo
- * @returns {JSX.Element} Component tab lưu trữ
- */
 const StorageTab = ({ vm }) => {
+  const { getVMStorageDetails, updateVMStorage, loading, error } = useVM();
+  const { showNotification } = useNotification();
+  
+  const [storageDetails, setStorageDetails] = useState(null);
   const [disks, setDisks] = useState([]);
-  const [snapshots, setSnapshots] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [creatingSnapshot, setCreatingSnapshot] = useState(false);
-  const [attachingDisk, setAttachingDisk] = useState(false);
-  const [newSnapshot, setNewSnapshot] = useState({
-    name: '',
-    description: ''
-  });
-  const [diskUsageData, setDiskUsageData] = useState([]);
-
-  // Tải dữ liệu lưu trữ khi component mount
+  const [volumeGroups, setVolumeGroups] = useState([]);
+  const [showAddDiskModal, setShowAddDiskModal] = useState(false);
+  const [showResizeDiskModal, setShowResizeDiskModal] = useState(false);
+  const [selectedDisk, setSelectedDisk] = useState(null);
+  const [newDiskSize, setNewDiskSize] = useState(10);
+  const [diskType, setDiskType] = useState('standard');
+  
   useEffect(() => {
-    const fetchStorageData = async () => {
-      setLoading(true);
+    const fetchStorageDetails = async () => {
       try {
-        // Giả lập API endpoint
-        const response = await fetch(`/api/vms/${vm.id}/storage`);
-        if (!response.ok) {
-          throw new Error('Không thể tải dữ liệu lưu trữ');
-        }
-        
-        const data = await response.json();
-        setDisks(data.disks || []);
-        setSnapshots(data.snapshots || []);
-        
-        // Chuẩn bị dữ liệu cho biểu đồ
-        prepareChartData(data.disks);
-        
+        const details = await getVMStorageDetails(vm.id);
+        setStorageDetails(details);
+        setDisks(details.disks || []);
+        setVolumeGroups(details.volumeGroups || []);
       } catch (err) {
-        console.error('Error fetching storage data:', err);
-        setError(err.message || 'Đã xảy ra lỗi khi tải dữ liệu lưu trữ');
-      } finally {
-        setLoading(false);
+        console.error('Error fetching storage details:', err);
       }
     };
-
-    // Giả lập fetch API
-    setTimeout(() => {
-      // Giả lập dữ liệu
-      const mockDisks = [
-        {
-          id: 'd-1',
-          name: 'Root Disk',
-          device: '/dev/sda',
-          type: 'SSD',
-          size: 100,
-          used: 45,
-          status: 'attached',
-          isRoot: true,
-          createdAt: '2023-02-15T10:30:00Z'
-        },
-        {
-          id: 'd-2',
-          name: 'Data Disk',
-          device: '/dev/sdb',
-          type: 'SSD',
-          size: 500,
-          used: 220,
-          status: 'attached',
-          isRoot: false,
-          createdAt: '2023-02-15T10:35:00Z'
-        }
-      ];
-      
-      const mockSnapshots = [
-        {
-          id: 's-1',
-          name: 'Pre-update snapshot',
-          description: 'Snapshot before system update',
-          diskId: 'd-1',
-          size: 42,
-          status: 'completed',
-          createdAt: '2023-03-05T14:20:00Z'
-        },
-        {
-          id: 's-2',
-          name: 'Weekly backup',
-          description: 'Regular weekly backup',
-          diskId: 'd-1',
-          size: 45,
-          status: 'completed',
-          createdAt: '2023-03-12T02:00:00Z'
-        }
-      ];
-      
-      setDisks(mockDisks);
-      setSnapshots(mockSnapshots);
-      
-      // Chuẩn bị dữ liệu cho biểu đồ
-      prepareChartData(mockDisks);
-      
-      setLoading(false);
-    }, 1000);
     
-  }, [vm.id]);
-
-  /**
-   * Chuẩn bị dữ liệu cho biểu đồ
-   * 
-   * @param {Array} disksData - Dữ liệu các đĩa
-   */
-  const prepareChartData = (disksData) => {
-    if (!disksData || disksData.length === 0) return;
+    fetchStorageDetails();
+  }, [vm.id, getVMStorageDetails]);
+  
+  const handleAddDisk = async () => {
+    try {
+      const result = await updateVMStorage(vm.id, {
+        action: 'addDisk',
+        size: newDiskSize,
+        type: diskType
+      });
+      
+      if (result.success) {
+        // Update the local state with the new disk
+        setDisks(prevDisks => [...prevDisks, result.disk]);
+        
+        showNotification({
+          type: 'success',
+          message: 'New disk added successfully'
+        });
+        
+        setShowAddDiskModal(false);
+      }
+    } catch (err) {
+      console.error('Error adding disk:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to add disk: ${err.message}`
+      });
+    }
+  };
+  
+  const handleResizeDisk = async () => {
+    if (!selectedDisk) return;
     
-    const chartData = disksData.map(disk => ({
+    try {
+      const result = await updateVMStorage(vm.id, {
+        action: 'resizeDisk',
+        diskId: selectedDisk.id,
+        newSize: newDiskSize
+      });
+      
+      if (result.success) {
+        // Update the local state
+        setDisks(prevDisks => 
+          prevDisks.map(disk => 
+            disk.id === selectedDisk.id 
+              ? { ...disk, size: newDiskSize * 1024 * 1024 * 1024 } 
+              : disk
+          )
+        );
+        
+        showNotification({
+          type: 'success',
+          message: 'Disk resized successfully'
+        });
+        
+        setShowResizeDiskModal(false);
+        setSelectedDisk(null);
+      }
+    } catch (err) {
+      console.error('Error resizing disk:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to resize disk: ${err.message}`
+      });
+    }
+  };
+  
+  const handleDetachDisk = async (diskId) => {
+    try {
+      const result = await updateVMStorage(vm.id, {
+        action: 'detachDisk',
+        diskId: diskId
+      });
+      
+      if (result.success) {
+        // Update the local state
+        setDisks(prevDisks => prevDisks.filter(disk => disk.id !== diskId));
+        
+        showNotification({
+          type: 'success',
+          message: 'Disk detached successfully'
+        });
+      }
+    } catch (err) {
+      console.error('Error detaching disk:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to detach disk: ${err.message}`
+      });
+    }
+  };
+  
+  const openResizeDiskModal = (disk) => {
+    setSelectedDisk(disk);
+    setNewDiskSize(Math.floor(disk.size / (1024 * 1024 * 1024))); // Convert bytes to GB
+    setShowResizeDiskModal(true);
+  };
+  
+  // Prepare data for storage usage pie chart
+  const preparePieChartData = () => {
+    if (!disks || disks.length === 0) {
+      return [{ name: 'No Data', value: 100 }];
+    }
+    
+    return disks.map(disk => ({
       name: disk.name,
-      used: disk.used,
-      free: disk.size - disk.used
+      value: disk.size,
+      fill: disk.type === 'ssd' ? '#4CAF50' : '#2196F3'
     }));
-    
-    // Tạo dữ liệu cho biểu đồ tròn
-    const pieData = [];
-    chartData.forEach(disk => {
-      pieData.push(
-        { name: `${disk.name} (Đã dùng)`, value: disk.used, color: '#f44336' },
-        { name: `${disk.name} (Trống)`, value: disk.free, color: '#4caf50' }
-      );
-    });
-    
-    setDiskUsageData(pieData);
   };
-
-  /**
-   * Tạo một snapshot mới
-   */
-  const handleCreateSnapshot = () => {
-    if (!newSnapshot.name) {
-      alert('Vui lòng nhập tên snapshot');
-      return;
-    }
-    
-    setCreatingSnapshot(true);
-    
-    // Giả lập API call
-    setTimeout(() => {
-      const newSnap = {
-        id: `s-${Date.now()}`,
-        name: newSnapshot.name,
-        description: newSnapshot.description,
-        diskId: 'd-1', // Mặc định disk đầu tiên
-        size: disks[0]?.used || 0,
-        status: 'completed',
-        createdAt: new Date().toISOString()
-      };
-      
-      setSnapshots([newSnap, ...snapshots]);
-      setNewSnapshot({ name: '', description: '' });
-      setCreatingSnapshot(false);
-    }, 2000);
-  };
-
-  /**
-   * Định dạng kích thước
-   * 
-   * @param {number} sizeGB - Kích thước tính bằng GB
-   * @returns {string} Kích thước đã định dạng
-   */
-  const formatSize = (sizeGB) => {
-    if (sizeGB < 1) {
-      return `${Math.round(sizeGB * 1024)} MB`;
-    } else if (sizeGB >= 1024) {
-      return `${(sizeGB / 1024).toFixed(2)} TB`;
-    } else {
-      return `${sizeGB} GB`;
-    }
-  };
-
-  /**
-   * Định dạng thời gian
-   * 
-   * @param {string} dateString - Chuỗi thời gian
-   * @returns {string} Thời gian đã định dạng
-   */
-  const formatDateTime = (dateString) => {
-    return new Date(dateString).toLocaleString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Nếu đang tải
-  if (loading && !disks.length && !snapshots.length) {
+  
+  if (loading && !storageDetails) {
     return (
-      <div className="storage-tab">
-        <div className="loading-container">
-          <Spinner size="large" />
-          <p>Đang tải thông tin lưu trữ...</p>
-        </div>
+      <div className="storage-loading">
+        <Spinner />
+        <p>Loading storage details...</p>
       </div>
     );
   }
-
-  // Nếu có lỗi
+  
   if (error) {
     return (
-      <div className="storage-tab">
-        <div className="error-container">
-          <i className="fas fa-exclamation-circle"></i>
-          <p>{error}</p>
-          <button 
-            className="retry-btn"
-            onClick={() => window.location.reload()}
-          >
-            Thử lại
-          </button>
-        </div>
-      </div>
+      <ErrorState 
+        title="Failed to load storage details"
+        message={error.message}
+      />
     );
   }
-
+  
+  if (!storageDetails) {
+    return (
+      <ErrorState 
+        title="No storage details available"
+        message="Unable to retrieve storage information for this virtual machine."
+      />
+    );
+  }
+  
   return (
     <div className="storage-tab">
-      <div className="disks-section">
-        <Card className="disks-card">
-          <CardHeader>
-            <CardTitle>Đĩa lưu trữ</CardTitle>
-            <button className="attach-disk-btn">
-              <i className="fas fa-plus"></i>
-              <span>Gắn đĩa mới</span>
-            </button>
-          </CardHeader>
-          <CardContent>
-            {disks.length === 0 ? (
-              <div className="empty-disks">
-                <i className="fas fa-hdd"></i>
-                <p>Không có đĩa lưu trữ nào</p>
+      <div className="storage-overview">
+        <Card title="Storage Overview">
+          <div className="storage-summary">
+            <div className="storage-chart">
+              <PieChart 
+                data={preparePieChartData()}
+                dataKey="value"
+                nameKey="name"
+                width={200}
+                height={200}
+              />
+            </div>
+            <div className="storage-stats">
+              <div className="stat-item">
+                <div className="stat-label">Total Storage</div>
+                <div className="stat-value">
+                  {formatBytes(disks.reduce((total, disk) => total + disk.size, 0))}
+                </div>
               </div>
-            ) : (
-              <div className="disks-list">
-                {disks.map((disk) => (
-                  <div key={disk.id} className="disk-item">
-                    <div className="disk-header">
-                      <div className="disk-name">
-                        <i className={`fas fa-${disk.isRoot ? 'server' : 'hdd'}`}></i>
-                        <span>{disk.name}</span>
-                        {disk.isRoot && <span className="root-badge">Root</span>}
-                      </div>
-                      <div className="disk-status">
-                        <span className={`status-indicator ${disk.status}`}></span>
-                        <span className="status-text">{disk.status}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="disk-details">
-                      <div className="detail-group">
-                        <div className="detail-label">Device</div>
-                        <div className="detail-value">{disk.device}</div>
-                      </div>
-                      
-                      <div className="detail-group">
-                        <div className="detail-label">Loại</div>
-                        <div className="detail-value">{disk.type}</div>
-                      </div>
-                      
-                      <div className="detail-group">
-                        <div className="detail-label">Kích thước</div>
-                        <div className="detail-value">{formatSize(disk.size)}</div>
-                      </div>
-                      
-                      <div className="detail-group">
-                        <div className="detail-label">Đã sử dụng</div>
-                        <div className="detail-value">
-                          {formatSize(disk.used)} ({Math.round((disk.used / disk.size) * 100)}%)
-                        </div>
-                      </div>
-                      
-                      <div className="detail-group">
-                        <div className="detail-label">Còn trống</div>
-                        <div className="detail-value">{formatSize(disk.size - disk.used)}</div>
-                      </div>
-                      
-                      <div className="disk-usage-bar">
-                        <div 
-                          className="usage-fill"
-                          style={{width: `${(disk.used / disk.size) * 100}%`}}
-                        ></div>
-                      </div>
-                      
-                      <div className="disk-actions">
-                        <button className="action-btn" disabled={disk.isRoot}>
-                          <i className="fas fa-eject"></i>
-                          <span>Tháo gỡ</span>
-                        </button>
-                        <button className="action-btn">
-                          <i className="fas fa-camera"></i>
-                          <span>Tạo snapshot</span>
-                        </button>
-                        <button className="action-btn" disabled={disk.isRoot}>
-                          <i className="fas fa-trash-alt"></i>
-                          <span>Xóa</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="stat-item">
+                <div className="stat-label">Disk Count</div>
+                <div className="stat-value">{disks.length}</div>
               </div>
-            )}
-          </CardContent>
+              <div className="stat-item">
+                <div className="stat-label">Primary Disk</div>
+                <div className="stat-value">
+                  {disks.find(disk => disk.isPrimary)?.name || 'N/A'}
+                </div>
+              </div>
+              <div className="stat-item">
+                <div className="stat-label">Storage Performance</div>
+                <div className="stat-value">
+                  {disks.some(disk => disk.type === 'ssd') ? 'SSD Available' : 'Standard'}
+                </div>
+              </div>
+            </div>
+          </div>
         </Card>
       </div>
-
-      <div className="disk-usage-section">
-        <Card className="disk-usage-card">
-          <CardHeader>
-            <CardTitle>Tình trạng sử dụng đĩa</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {diskUsageData.length === 0 ? (
-              <div className="empty-chart">
-                <i className="fas fa-chart-pie"></i>
-                <p>Không có dữ liệu</p>
-              </div>
-            ) : (
-              <div className="disk-usage-chart">
-                <PieChart
-                  data={diskUsageData}
-                  nameKey="name"
-                  dataKey="value"
-                  height={300}
-                  showLegend={true}
-                  colors={diskUsageData.map(item => item.color)}
+      
+      <Card 
+        title="Attached Disks" 
+        actions={
+          <Button 
+            variant="primary" 
+            size="small"
+            icon="plus"
+            onClick={() => setShowAddDiskModal(true)}
+          >
+            Add Disk
+          </Button>
+        }
+      >
+        <Table
+          columns={[
+            { key: 'name', header: 'Disk Name' },
+            { key: 'devicePath', header: 'Device Path' },
+            { key: 'size', header: 'Size', render: (row) => formatBytes(row.size) },
+            { key: 'type', header: 'Type', render: (row) => (
+              <StatusBadge 
+                status={row.type === 'ssd' ? 'success' : 'info'} 
+                text={row.type === 'ssd' ? 'SSD' : 'Standard'}
+              />
+            )},
+            { key: 'status', header: 'Status', render: (row) => (
+              <StatusBadge 
+                status={row.status === 'attached' ? 'success' : 'warning'} 
+                text={row.status}
+              />
+            )},
+            { key: 'actions', header: 'Actions', render: (row) => (
+              <div className="table-actions">
+                <Button 
+                  variant="icon" 
+                  icon="expand"
+                  onClick={() => openResizeDiskModal(row)}
+                  title="Resize disk"
+                  disabled={row.isPrimary}
+                />
+                <Button 
+                  variant="icon" 
+                  icon="unlink"
+                  onClick={() => handleDetachDisk(row.id)}
+                  title="Detach disk"
+                  disabled={row.isPrimary}
                 />
               </div>
             )}
-          </CardContent>
+          ]}
+          data={disks}
+          emptyMessage="No disks attached to this virtual machine"
+        />
+      </Card>
+      
+      {volumeGroups && volumeGroups.length > 0 && (
+        <Card title="Volume Groups">
+          <Table
+            columns={[
+              { key: 'name', header: 'Group Name' },
+              { key: 'type', header: 'Type' },
+              { key: 'disks', header: 'Disks', render: (row) => row.disks.join(', ') },
+              { key: 'totalSize', header: 'Total Size', render: (row) => formatBytes(row.totalSize) },
+              { key: 'usedSize', header: 'Used', render: (row) => formatBytes(row.usedSize) }
+            ]}
+            data={volumeGroups}
+            emptyMessage="No volume groups configured"
+          />
         </Card>
-      </div>
-
-      <div className="snapshots-section">
-        <Card className="snapshots-card">
-          <CardHeader>
-            <CardTitle>Snapshots</CardTitle>
-            <button 
-              className="create-snapshot-btn"
-              onClick={() => document.getElementById('snapshot-modal').classList.add('open')}
-            >
-              <i className="fas fa-camera"></i>
-              <span>Tạo snapshot</span>
-            </button>
-          </CardHeader>
-          <CardContent>
-            {snapshots.length === 0 ? (
-              <div className="empty-snapshots">
-                <i className="fas fa-camera"></i>
-                <p>Không có snapshot nào</p>
-                <p className="hint">Snapshots giúp bạn lưu trữ trạng thái hiện tại của máy ảo và có thể khôi phục lại sau này</p>
-              </div>
-            ) : (
-              <div className="snapshots-table-container">
-                <table className="snapshots-table">
-                  <thead>
-                    <tr>
-                      <th>Tên</th>
-                      <th>Mô tả</th>
-                      <th>Đĩa nguồn</th>
-                      <th>Kích thước</th>
-                      <th>Ngày tạo</th>
-                      <th>Trạng thái</th>
-                      <th>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {snapshots.map((snapshot) => {
-                      const sourceDisk = disks.find(d => d.id === snapshot.diskId);
-                      return (
-                        <tr key={snapshot.id}>
-                          <td className="snapshot-name">{snapshot.name}</td>
-                          <td className="snapshot-desc">{snapshot.description || '-'}</td>
-                          <td>{sourceDisk?.name || 'N/A'}</td>
-                          <td>{formatSize(snapshot.size)}</td>
-                          <td>{formatDateTime(snapshot.createdAt)}</td>
-                          <td>
-                            <span className={`status-badge ${snapshot.status}`}>
-                              {snapshot.status}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="snapshot-actions">
-                              <button className="table-action-btn" title="Khôi phục">
-                                <i className="fas fa-undo"></i>
-                              </button>
-                              <button className="table-action-btn" title="Tạo VM mới">
-                                <i className="fas fa-clone"></i>
-                              </button>
-                              <button className="table-action-btn" title="Xóa">
-                                <i className="fas fa-trash-alt"></i>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Modal tạo snapshot */}
-      <div id="snapshot-modal" className="modal">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h3>Tạo snapshot mới</h3>
-            <button
-              className="close-btn"
-              onClick={() => document.getElementById('snapshot-modal').classList.remove('open')}
-            >
-              <i className="fas fa-times"></i>
-            </button>
+      )}
+      
+      {/* Add Disk Modal */}
+      {showAddDiskModal && (
+        <Modal
+          title="Add New Disk"
+          onClose={() => setShowAddDiskModal(false)}
+          size="small"
+        >
+          <div className="form-group">
+            <label>Disk Size (GB)</label>
+            <input 
+              type="number" 
+              value={newDiskSize}
+              min="1"
+              max="16384"
+              onChange={(e) => setNewDiskSize(parseInt(e.target.value))}
+              className="form-control"
+            />
           </div>
-          <div className="modal-body">
-            <div className="form-group">
-              <label htmlFor="snapshot-name">Tên snapshot*</label>
-              <input
-                type="text"
-                id="snapshot-name"
-                value={newSnapshot.name}
-                onChange={e => setNewSnapshot({...newSnapshot, name: e.target.value})}
-                placeholder="Nhập tên snapshot"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="snapshot-desc">Mô tả</label>
-              <textarea
-                id="snapshot-desc"
-                value={newSnapshot.description}
-                onChange={e => setNewSnapshot({...newSnapshot, description: e.target.value})}
-                placeholder="Mô tả snapshot (tùy chọn)"
-                rows={3}
-              ></textarea>
-            </div>
-            <div className="form-group">
-              <label htmlFor="snapshot-disk">Đĩa nguồn</label>
-              <select id="snapshot-disk" defaultValue={disks[0]?.id}>
-                {disks.map(disk => (
-                  <option key={disk.id} value={disk.id}>
-                    {disk.name} ({formatSize(disk.size)})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-notice">
-              <i className="fas fa-info-circle"></i>
-              <p>
-                Snapshot sẽ lưu trữ trạng thái hiện tại của đĩa. Quá trình này có thể mất một vài phút 
-                tùy thuộc vào kích thước đĩa. Máy ảo vẫn hoạt động bình thường trong quá trình tạo snapshot.
-              </p>
-            </div>
-          </div>
-          <div className="modal-footer">
-            <button
-              className="cancel-btn"
-              onClick={() => document.getElementById('snapshot-modal').classList.remove('open')}
+          
+          <div className="form-group">
+            <label>Disk Type</label>
+            <select 
+              value={diskType}
+              onChange={(e) => setDiskType(e.target.value)}
+              className="form-control"
             >
-              Hủy
-            </button>
-            <button
-              className="create-btn"
-              onClick={handleCreateSnapshot}
-              disabled={creatingSnapshot || !newSnapshot.name}
-            >
-              {creatingSnapshot ? (
-                <>
-                  <i className="fas fa-spinner fa-spin"></i>
-                  <span>Đang tạo...</span>
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-camera"></i>
-                  <span>Tạo snapshot</span>
-                </>
-              )}
-            </button>
+              <option value="standard">Standard</option>
+              <option value="ssd">SSD</option>
+            </select>
           </div>
-        </div>
-      </div>
+          
+          <div className="modal-actions">
+            <Button 
+              variant="secondary" 
+              onClick={() => setShowAddDiskModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleAddDisk}
+            >
+              Add Disk
+            </Button>
+          </div>
+        </Modal>
+      )}
+      
+      {/* Resize Disk Modal */}
+      {showResizeDiskModal && selectedDisk && (
+        <Modal
+          title={`Resize Disk: ${selectedDisk.name}`}
+          onClose={() => {
+            setShowResizeDiskModal(false);
+            setSelectedDisk(null);
+          }}
+          size="small"
+        >
+          <div className="form-group">
+            <label>Current Size</label>
+            <div>{formatBytes(selectedDisk.size)}</div>
+          </div>
+          
+          <div className="form-group">
+            <label>New Size (GB)</label>
+            <input 
+              type="number" 
+              value={newDiskSize}
+              min={Math.ceil(selectedDisk.size / (1024 * 1024 * 1024))}
+              max="16384"
+              onChange={(e) => setNewDiskSize(parseInt(e.target.value))}
+              className="form-control"
+            />
+            <small className="form-text">
+              Note: Disks can only be increased in size, not decreased
+            </small>
+          </div>
+          
+          <div className="modal-actions">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setShowResizeDiskModal(false);
+                setSelectedDisk(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleResizeDisk}
+              disabled={newDiskSize <= Math.floor(selectedDisk.size / (1024 * 1024 * 1024))}
+            >
+              Resize Disk
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
