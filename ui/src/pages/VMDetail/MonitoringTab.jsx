@@ -1,335 +1,314 @@
 import React, { useState, useEffect } from 'react';
-import { useVM } from '../../hooks';
-import { Card, CardHeader, CardTitle, CardContent, Spinner } from '../../components/common';
-import { LineChart, AreaChart, GaugeChart } from '../../components/charts';
-import { TimeRangeSelector } from '../../components/charts';
+import { Card } from '../../components/common/Card';
+import { Spinner } from '../../components/common/Spinner';
+import { ErrorState } from '../../components/common/ErrorState';
+import { TimeRangeSelector } from '../../components/charts/TimeRangeSelector';
+import { LineChart } from '../../components/charts/LineChart';
+import { AreaChart } from '../../components/charts/AreaChart';
+import { GaugeChart } from '../../components/charts/GaugeChart';
+import { useInterval } from '../../hooks/useInterval';
+import { useVM } from '../../hooks/useVM';
+import { formatBytes, formatPercentage } from '../../utils/format.utils';
 
-/**
- * Component tab giám sát máy ảo
- * 
- * @param {Object} props - Props component
- * @param {Object} props.vm - Thông tin máy ảo
- * @param {number} props.refreshInterval - Thời gian làm mới (ms)
- * @param {Function} props.onRefreshRateChange - Callback khi thay đổi tần suất làm mới
- * @returns {JSX.Element} Component tab giám sát
- */
-const MonitoringTab = ({ vm, refreshInterval, onRefreshRateChange }) => {
-  const { fetchVMStats, vmStats, loading } = useVM();
-  const [timeRange, setTimeRange] = useState('1h');
-  const [chartType, setChartType] = useState('line');
-  const [metrics, setMetrics] = useState(['cpu', 'memory', 'disk', 'network']);
+const MonitoringTab = ({ vmId }) => {
+  const { getVMMetrics, loading, error } = useVM();
   
-  // Lấy dữ liệu thống kê của VM hiện tại từ context
-  const currentStats = vmStats?.[vm.id] || null;
-
-  // Tải dữ liệu thống kê khi timeRange thay đổi
+  const [timeRange, setTimeRange] = useState('1h');
+  const [metrics, setMetrics] = useState(null);
+  const [liveUpdates, setLiveUpdates] = useState(true);
+  
+  // Define polling intervals based on time range
+  const getPollingInterval = () => {
+    switch (timeRange) {
+      case '15m':
+      case '1h':
+        return 10000; // 10 seconds
+      case '6h':
+        return 30000; // 30 seconds
+      case '1d':
+      case '1w':
+        return 60000; // 1 minute
+      default:
+        return 10000;
+    }
+  };
+  
+  // Fetch initial metrics
   useEffect(() => {
-    fetchVMStats(vm.id, { timeRange, metrics });
-  }, [vm.id, timeRange, metrics, fetchVMStats]);
-
-  /**
-   * Thay đổi khoảng thời gian hiển thị
-   * 
-   * @param {string} range - Khoảng thời gian mới
-   */
-  const handleRangeChange = (range) => {
+    const fetchMetrics = async () => {
+      try {
+        const data = await getVMMetrics(vmId, timeRange);
+        setMetrics(data);
+      } catch (err) {
+        console.error('Error fetching VM metrics:', err);
+      }
+    };
+    
+    fetchMetrics();
+  }, [vmId, timeRange, getVMMetrics]);
+  
+  // Set up polling for live updates
+  useInterval(() => {
+    const fetchLatestMetrics = async () => {
+      if (!liveUpdates) return;
+      
+      try {
+        const data = await getVMMetrics(vmId, timeRange);
+        setMetrics(data);
+      } catch (err) {
+        console.error('Error updating VM metrics:', err);
+      }
+    };
+    
+    fetchLatestMetrics();
+  }, getPollingInterval());
+  
+  const handleTimeRangeChange = (range) => {
     setTimeRange(range);
   };
-
-  /**
-   * Thay đổi loại biểu đồ
-   * 
-   * @param {string} type - Loại biểu đồ mới
-   */
-  const handleChartTypeChange = (type) => {
-    setChartType(type);
+  
+  const toggleLiveUpdates = () => {
+    setLiveUpdates(prev => !prev);
   };
-
-  /**
-   * Định dạng thông tin sử dụng tài nguyên
-   * 
-   * @param {string} resourceKey - Khóa tài nguyên
-   * @param {number} value - Giá trị
-   * @returns {string} Giá trị đã định dạng
-   */
-  const formatResourceUsage = (resourceKey, value) => {
-    if (value === undefined || value === null) return 'N/A';
+  
+  // Calculate current resource usage
+  const getCurrentUsage = () => {
+    if (!metrics || !metrics.cpu || metrics.cpu.length === 0) {
+      return {
+        cpu: 0,
+        memory: 0,
+        disk: 0,
+        network: 0
+      };
+    }
     
-    switch (resourceKey) {
-      case 'cpu':
-        return `${value.toFixed(1)}%`;
-      case 'memory':
-        return `${value.toFixed(1)}%`;
-      case 'disk':
-        return `${value.toFixed(1)}%`;
-      case 'network':
-        return value < 1024 
-          ? `${value.toFixed(2)} KB/s` 
-          : `${(value / 1024).toFixed(2)} MB/s`;
-      default:
-        return `${value}`;
-    }
-  };
-
-  /**
-   * Lấy tiêu đề biểu đồ
-   * 
-   * @param {string} resourceKey - Khóa tài nguyên
-   * @returns {string} Tiêu đề biểu đồ
-   */
-  const getChartTitle = (resourceKey) => {
-    switch (resourceKey) {
-      case 'cpu': return 'Sử dụng CPU';
-      case 'memory': return 'Sử dụng RAM';
-      case 'disk': return 'Sử dụng ổ đĩa';
-      case 'network': return 'Băng thông mạng';
-      default: return resourceKey;
-    }
-  };
-
-  /**
-   * Lấy đơn vị hiển thị
-   * 
-   * @param {string} resourceKey - Khóa tài nguyên
-   * @returns {string} Đơn vị
-   */
-  const getUnitLabel = (resourceKey) => {
-    switch (resourceKey) {
-      case 'cpu': return '%';
-      case 'memory': return '%';
-      case 'disk': return '%';
-      case 'network': return 'MB/s';
-      default: return '';
-    }
-  };
-
-  /**
-   * Render biểu đồ cho từng loại tài nguyên
-   * 
-   * @param {string} resourceKey - Khóa tài nguyên
-   * @returns {JSX.Element} Component biểu đồ
-   */
-  const renderResourceChart = (resourceKey) => {
-    if (!currentStats || !currentStats[resourceKey] || currentStats[resourceKey].length === 0) {
-      return (
-        <div className="empty-chart">
-          <div className="empty-chart-content">
-            <i className="fas fa-chart-line"></i>
-            <p>Không có dữ liệu</p>
-          </div>
-        </div>
-      );
-    }
-
-    const chartData = currentStats[resourceKey].map(point => ({
-      timestamp: new Date(point.timestamp).toLocaleTimeString(),
-      value: point.value
-    }));
-
-    // Lấy giá trị hiện tại (điểm cuối cùng)
-    const currentValue = chartData.length > 0 
-      ? chartData[chartData.length - 1].value 
-      : 0;
-
-    // Props chung cho các loại biểu đồ
-    const commonProps = {
-      data: chartData,
-      xAxisKey: 'timestamp',
-      seriesKeys: ['value'],
-      height: 200,
-      showLegend: false,
-      showTooltip: true,
-      showGrid: true,
-      yAxisLabel: getUnitLabel(resourceKey)
+    return {
+      cpu: metrics.cpu[metrics.cpu.length - 1].value,
+      memory: metrics.memory[metrics.memory.length - 1].value,
+      disk: metrics.disk[metrics.disk.length - 1].value,
+      network: metrics.network[metrics.network.length - 1].value
     };
-
-    // Render loại biểu đồ khác nhau dựa trên chartType
+  };
+  
+  if (loading && !metrics) {
     return (
-      <div className="resource-chart">
-        <div className="chart-header">
-          <div className="current-value">
-            <span>Hiện tại:</span>
-            <span className="value">{formatResourceUsage(resourceKey, currentValue)}</span>
-          </div>
-        </div>
-        
-        <div className="chart-container">
-          {chartType === 'line' && <LineChart {...commonProps} />}
-          {chartType === 'area' && <AreaChart {...commonProps} />}
-          {chartType === 'gauge' && (
-            <div className="gauge-chart-container">
-              <GaugeChart
-                value={currentValue}
-                min={0}
-                max={resourceKey === 'network' ? 100 : 100}
-                height={150}
-                label={formatResourceUsage(resourceKey, currentValue)}
-              />
-            </div>
-          )}
-        </div>
+      <div className="monitoring-loading">
+        <Spinner />
+        <p>Loading monitoring data...</p>
       </div>
     );
-  };
-
+  }
+  
+  if (error) {
+    return (
+      <ErrorState 
+        title="Failed to load monitoring data"
+        message={error.message}
+      />
+    );
+  }
+  
+  if (!metrics) {
+    return (
+      <ErrorState 
+        title="No monitoring data available"
+        message="Unable to retrieve monitoring data for this virtual machine."
+      />
+    );
+  }
+  
+  const currentUsage = getCurrentUsage();
+  
   return (
     <div className="monitoring-tab">
-      <div className="monitoring-controls">
-        <div className="control-group">
-          <TimeRangeSelector 
-            value={timeRange}
-            onChange={handleRangeChange}
+      <div className="monitoring-header">
+        <TimeRangeSelector 
+          value={timeRange}
+          onChange={handleTimeRangeChange}
+          options={[
+            { value: '15m', label: '15 Minutes' },
+            { value: '1h', label: '1 Hour' },
+            { value: '6h', label: '6 Hours' },
+            { value: '1d', label: '1 Day' },
+            { value: '1w', label: '1 Week' }
+          ]}
+        />
+        
+        <label className="live-updates-toggle">
+          <input 
+            type="checkbox" 
+            checked={liveUpdates} 
+            onChange={toggleLiveUpdates}
           />
-        </div>
-        
-        <div className="control-group">
-          <label>Loại biểu đồ:</label>
-          <div className="chart-type-buttons">
-            <button 
-              className={`chart-type-btn ${chartType === 'line' ? 'active' : ''}`}
-              onClick={() => handleChartTypeChange('line')}
-            >
-              <i className="fas fa-chart-line"></i>
-              <span>Line</span>
-            </button>
-            <button 
-              className={`chart-type-btn ${chartType === 'area' ? 'active' : ''}`}
-              onClick={() => handleChartTypeChange('area')}
-            >
-              <i className="fas fa-chart-area"></i>
-              <span>Area</span>
-            </button>
-            <button 
-              className={`chart-type-btn ${chartType === 'gauge' ? 'active' : ''}`}
-              onClick={() => handleChartTypeChange('gauge')}
-            >
-              <i className="fas fa-tachometer-alt"></i>
-              <span>Gauge</span>
-            </button>
+          Live Updates
+        </label>
+      </div>
+      
+      <div className="current-usage-section">
+        <Card title="Current Resource Usage">
+          <div className="gauge-charts-container">
+            <div className="gauge-chart-item">
+              <GaugeChart 
+                value={currentUsage.cpu}
+                maxValue={100}
+                label="CPU"
+                unit="%"
+                color="#2196F3"
+              />
+              <div className="gauge-value">
+                {formatPercentage(currentUsage.cpu)}
+              </div>
+            </div>
+            
+            <div className="gauge-chart-item">
+              <GaugeChart 
+                value={currentUsage.memory}
+                maxValue={100}
+                label="Memory"
+                unit="%"
+                color="#4CAF50"
+              />
+              <div className="gauge-value">
+                {formatPercentage(currentUsage.memory)}
+              </div>
+            </div>
+            
+            <div className="gauge-chart-item">
+              <GaugeChart 
+                value={currentUsage.disk}
+                maxValue={100}
+                label="Disk"
+                unit="%"
+                color="#FF9800"
+              />
+              <div className="gauge-value">
+                {formatPercentage(currentUsage.disk)}
+              </div>
+            </div>
+            
+            <div className="gauge-chart-item">
+              <GaugeChart 
+                value={currentUsage.network / 1000000} // Convert to Mbps
+                maxValue={1000} // Assume 1 Gbps maximum
+                label="Network"
+                unit="Mbps"
+                color="#9C27B0"
+              />
+              <div className="gauge-value">
+                {formatBytes(currentUsage.network)}/s
+              </div>
+            </div>
           </div>
-        </div>
-        
-        <div className="control-group">
-          <label>Tự động làm mới:</label>
-          <select 
-            value={refreshInterval} 
-            onChange={(e) => onRefreshRateChange(Number(e.target.value))}
-            className="refresh-select"
-          >
-            <option value="0">Tắt</option>
-            <option value="5000">5 giây</option>
-            <option value="10000">10 giây</option>
-            <option value="30000">30 giây</option>
-            <option value="60000">1 phút</option>
-          </select>
-        </div>
+        </Card>
       </div>
-
+      
       <div className="charts-grid">
-        <Card className="chart-card">
-          <CardHeader>
-            <CardTitle>{getChartTitle('cpu')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && !currentStats ? (
-              <div className="chart-loading">
-                <Spinner size="medium" />
-              </div>
-            ) : (
-              renderResourceChart('cpu')
-            )}
-          </CardContent>
+        <Card title="CPU Usage">
+          <LineChart 
+            data={metrics.cpu}
+            dataKey="value"
+            xAxisDataKey="timestamp"
+            yAxisLabel="%"
+            stroke="#2196F3"
+            yDomain={[0, 100]}
+          />
         </Card>
-
-        <Card className="chart-card">
-          <CardHeader>
-            <CardTitle>{getChartTitle('memory')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && !currentStats ? (
-              <div className="chart-loading">
-                <Spinner size="medium" />
-              </div>
-            ) : (
-              renderResourceChart('memory')
-            )}
-          </CardContent>
+        
+        <Card title="Memory Usage">
+          <AreaChart 
+            data={metrics.memory}
+            dataKey="value"
+            xAxisDataKey="timestamp"
+            yAxisLabel="%"
+            fill="#4CAF50"
+            stroke="#4CAF50"
+            fillOpacity={0.3}
+            yDomain={[0, 100]}
+          />
         </Card>
-
-        <Card className="chart-card">
-          <CardHeader>
-            <CardTitle>{getChartTitle('disk')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && !currentStats ? (
-              <div className="chart-loading">
-                <Spinner size="medium" />
-              </div>
-            ) : (
-              renderResourceChart('disk')
-            )}
-          </CardContent>
+        
+        <Card title="Disk Usage">
+          <AreaChart 
+            data={metrics.disk}
+            dataKey="value"
+            xAxisDataKey="timestamp"
+            yAxisLabel="%"
+            fill="#FF9800"
+            stroke="#FF9800"
+            fillOpacity={0.3}
+            yDomain={[0, 100]}
+          />
         </Card>
-
-        <Card className="chart-card">
-          <CardHeader>
-            <CardTitle>{getChartTitle('network')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading && !currentStats ? (
-              <div className="chart-loading">
-                <Spinner size="medium" />
-              </div>
-            ) : (
-              renderResourceChart('network')
-            )}
-          </CardContent>
+        
+        <Card title="Network Traffic">
+          <LineChart 
+            data={metrics.network}
+            dataKey="value"
+            xAxisDataKey="timestamp"
+            yAxisLabel="Bytes/s"
+            stroke="#9C27B0"
+            formatYAxis={(value) => formatBytes(value)}
+          />
         </Card>
       </div>
-
-      <Card className="performance-insights-card">
-        <CardHeader>
-          <CardTitle>Phân tích hiệu suất</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {vm.performanceInsights && vm.performanceInsights.length > 0 ? (
-            <div className="insights-list">
-              {vm.performanceInsights.map((insight, index) => (
-                <div key={index} className={`insight-item ${insight.severity}`}>
-                  <div className="insight-icon">
-                    <i className={`fas fa-${
-                      insight.severity === 'critical' 
-                        ? 'exclamation-circle' 
-                        : insight.severity === 'warning' 
-                        ? 'exclamation-triangle' 
-                        : 'info-circle'
-                    }`}></i>
-                  </div>
-                  <div className="insight-content">
-                    <h4 className="insight-title">{insight.title}</h4>
-                    <p className="insight-message">{insight.message}</p>
-                    {insight.recommendation && (
-                      <div className="recommendation">
-                        <strong>Khuyến nghị:</strong> {insight.recommendation}
-                      </div>
-                    )}
-                    <div className="insight-meta">
-                      <span>{insight.resourceType}</span>
-                      <span>{new Date(insight.timestamp).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+      
+      {metrics.diskIo && (
+        <Card title="Disk I/O">
+          <div className="dual-chart">
+            <div className="chart-half">
+              <h4>Read</h4>
+              <LineChart 
+                data={metrics.diskIo.filter(d => d.type === 'read')}
+                dataKey="value"
+                xAxisDataKey="timestamp"
+                yAxisLabel="Bytes/s"
+                stroke="#00BCD4"
+                formatYAxis={(value) => formatBytes(value)}
+              />
             </div>
-          ) : (
-            <div className="empty-insights">
-              <i className="fas fa-check-circle"></i>
-              <p>Không có vấn đề hiệu suất nào được phát hiện</p>
-              <p className="hint">Hệ thống đang hoạt động bình thường</p>
+            <div className="chart-half">
+              <h4>Write</h4>
+              <LineChart 
+                data={metrics.diskIo.filter(d => d.type === 'write')}
+                dataKey="value"
+                xAxisDataKey="timestamp"
+                yAxisLabel="Bytes/s"
+                stroke="#FF5722"
+                formatYAxis={(value) => formatBytes(value)}
+              />
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </Card>
+      )}
+      
+      {metrics.networkIo && (
+        <Card title="Network I/O">
+          <div className="dual-chart">
+            <div className="chart-half">
+              <h4>In</h4>
+              <LineChart 
+                data={metrics.networkIo.filter(d => d.type === 'in')}
+                dataKey="value"
+                xAxisDataKey="timestamp"
+                yAxisLabel="Bytes/s"
+                stroke="#3F51B5"
+                formatYAxis={(value) => formatBytes(value)}
+              />
+            </div>
+            <div className="chart-half">
+              <h4>Out</h4>
+              <LineChart 
+                data={metrics.networkIo.filter(d => d.type === 'out')}
+                dataKey="value"
+                xAxisDataKey="timestamp"
+                yAxisLabel="Bytes/s"
+                stroke="#E91E63"
+                formatYAxis={(value) => formatBytes(value)}
+              />
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

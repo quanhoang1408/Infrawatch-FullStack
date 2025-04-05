@@ -1,223 +1,538 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/common/Card';
-import { Button } from '@/components/common/Button';
-import { Table } from '@/components/common/Table';
-import { Tooltip } from '@/components/common/Tooltip';
-import { useVM } from '@/hooks/useVM';
-import { useNotification } from '@/hooks/useNotification';
-import { certificateService } from '@/services/certificate.service';
-import { ShieldCheck, ShieldAlert, Key, Lock, Unlock } from 'lucide-react';
+import { Card } from '../../components/common/Card';
+import { Button } from '../../components/common/Button';
+import { Spinner } from '../../components/common/Spinner';
+import { ErrorState } from '../../components/common/ErrorState';
+import { Table } from '../../components/common/Table';
+import { Modal } from '../../components/common/Modal';
+import { StatusBadge } from '../../components/common/StatusBadge';
+import { CertificateCard } from '../../components/certificates/CertificateCard';
+import { useVM } from '../../hooks/useVM';
+import { useCertificate } from '../../hooks/useCertificate';
+import { useNotification } from '../../hooks/useNotification';
+import { formatDate } from '../../utils/format.utils';
 
-const SecurityTab = ({ vmId }) => {
-  const { vm } = useVM(vmId);
+const SecurityTab = ({ vm }) => {
+  const { getVMSecurityDetails, updateVMSecurity, loading, error } = useVM();
+  const { generateCertificate, revokeCertificate } = useCertificate();
   const { showNotification } = useNotification();
-  const [securityDetails, setSecurityDetails] = useState({
-    firewallRules: [],
-    sshCertificates: [],
-    securityGroups: []
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
+  
+  const [securityDetails, setSecurityDetails] = useState(null);
+  const [sshKeys, setSSHKeys] = useState([]);
+  const [certificates, setCertificates] = useState([]);
+  const [securityScans, setSecurityScans] = useState([]);
+  const [showAddKeyModal, setShowAddKeyModal] = useState(false);
+  const [showGenerateCertModal, setShowGenerateCertModal] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyValue, setNewKeyValue] = useState('');
+  const [newCertName, setNewCertName] = useState('');
+  const [newCertValidity, setNewCertValidity] = useState(30); // Days
+  
   useEffect(() => {
     const fetchSecurityDetails = async () => {
       try {
-        setIsLoading(true);
-        // Fetch security details for the specific VM
-        const details = await certificateService.getVMSecurityDetails(vmId);
+        const details = await getVMSecurityDetails(vm.id);
         setSecurityDetails(details);
-        setIsLoading(false);
-      } catch (error) {
-        showNotification({
-          type: 'error',
-          message: 'Failed to fetch security details',
-          description: error.message
-        });
-        setIsLoading(false);
+        setSSHKeys(details.sshKeys || []);
+        setCertificates(details.certificates || []);
+        setSecurityScans(details.securityScans || []);
+      } catch (err) {
+        console.error('Error fetching security details:', err);
       }
     };
-
+    
     fetchSecurityDetails();
-  }, [vmId]);
-
-  const handleRotateCertificate = async (certificateId) => {
-    try {
-      await certificateService.rotateCertificate(vmId, certificateId);
-      showNotification({
-        type: 'success',
-        message: 'Certificate rotated successfully'
-      });
-      // Refresh security details
-      const details = await certificateService.getVMSecurityDetails(vmId);
-      setSecurityDetails(details);
-    } catch (error) {
+  }, [vm.id, getVMSecurityDetails]);
+  
+  const handleAddSSHKey = async () => {
+    if (!newKeyName || !newKeyValue) {
       showNotification({
         type: 'error',
-        message: 'Failed to rotate certificate',
-        description: error.message
+        message: 'Key name and value are required'
+      });
+      return;
+    }
+    
+    try {
+      const result = await updateVMSecurity(vm.id, {
+        action: 'addSSHKey',
+        keyName: newKeyName,
+        keyValue: newKeyValue
+      });
+      
+      if (result.success) {
+        // Update the local state
+        setSSHKeys(prevKeys => [...prevKeys, result.key]);
+        
+        showNotification({
+          type: 'success',
+          message: 'SSH key added successfully'
+        });
+        
+        setShowAddKeyModal(false);
+        setNewKeyName('');
+        setNewKeyValue('');
+      }
+    } catch (err) {
+      console.error('Error adding SSH key:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to add SSH key: ${err.message}`
       });
     }
   };
-
-  const renderSecurityStatus = () => {
-    // Determine overall security status based on firewall rules and certificates
-    const hasSecurityIssues = 
-      securityDetails.firewallRules.some(rule => rule.status === 'risky') ||
-      securityDetails.sshCertificates.some(cert => cert.status === 'expired');
-
+  
+  const handleDeleteSSHKey = async (keyId) => {
+    try {
+      const result = await updateVMSecurity(vm.id, {
+        action: 'removeSSHKey',
+        keyId: keyId
+      });
+      
+      if (result.success) {
+        // Update the local state
+        setSSHKeys(prevKeys => prevKeys.filter(key => key.id !== keyId));
+        
+        showNotification({
+          type: 'success',
+          message: 'SSH key removed successfully'
+        });
+      }
+    } catch (err) {
+      console.error('Error removing SSH key:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to remove SSH key: ${err.message}`
+      });
+    }
+  };
+  
+  const handleGenerateCertificate = async () => {
+    if (!newCertName) {
+      showNotification({
+        type: 'error',
+        message: 'Certificate name is required'
+      });
+      return;
+    }
+    
+    try {
+      const result = await generateCertificate({
+        vmId: vm.id,
+        name: newCertName,
+        validityDays: newCertValidity
+      });
+      
+      if (result.success) {
+        // Update the local state
+        setCertificates(prevCerts => [...prevCerts, result.certificate]);
+        
+        showNotification({
+          type: 'success',
+          message: 'Certificate generated successfully'
+        });
+        
+        setShowGenerateCertModal(false);
+        setNewCertName('');
+      }
+    } catch (err) {
+      console.error('Error generating certificate:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to generate certificate: ${err.message}`
+      });
+    }
+  };
+  
+  const handleRevokeCertificate = async (certId) => {
+    try {
+      const result = await revokeCertificate(certId);
+      
+      if (result.success) {
+        // Update the local state
+        setCertificates(prevCerts => 
+          prevCerts.map(cert => 
+            cert.id === certId 
+              ? { ...cert, status: 'revoked', revokedAt: new Date().toISOString() } 
+              : cert
+          )
+        );
+        
+        showNotification({
+          type: 'success',
+          message: 'Certificate revoked successfully'
+        });
+      }
+    } catch (err) {
+      console.error('Error revoking certificate:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to revoke certificate: ${err.message}`
+      });
+    }
+  };
+  
+  const runSecurityScan = async () => {
+    try {
+      const result = await updateVMSecurity(vm.id, {
+        action: 'runSecurityScan'
+      });
+      
+      if (result.success) {
+        // Update the local state
+        setSecurityScans(prevScans => [result.scan, ...prevScans]);
+        
+        showNotification({
+          type: 'success',
+          message: 'Security scan initiated successfully'
+        });
+      }
+    } catch (err) {
+      console.error('Error running security scan:', err);
+      showNotification({
+        type: 'error',
+        message: `Failed to run security scan: ${err.message}`
+      });
+    }
+  };
+  
+  if (loading && !securityDetails) {
     return (
-      <div className="flex items-center mb-4">
-        {hasSecurityIssues ? (
-          <ShieldAlert className="text-red-500 mr-2" />
-        ) : (
-          <ShieldCheck className="text-green-500 mr-2" />
-        )}
-        <span className={`font-semibold ${hasSecurityIssues ? 'text-red-500' : 'text-green-500'}`}>
-          {hasSecurityIssues ? 'Security Risks Detected' : 'All Security Measures Intact'}
-        </span>
+      <div className="security-loading">
+        <Spinner />
+        <p>Loading security details...</p>
       </div>
     );
-  };
-
-  const firewallColumns = [
-    {
-      title: 'Port',
-      dataIndex: 'port',
-      key: 'port'
-    },
-    {
-      title: 'Protocol',
-      dataIndex: 'protocol',
-      key: 'protocol'
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <span className={`
-          px-2 py-1 rounded 
-          ${status === 'open' ? 'bg-red-100 text-red-800' : 
-            status === 'restricted' ? 'bg-yellow-100 text-yellow-800' : 
-            'bg-green-100 text-green-800'}
-        `}>
-          {status}
-        </span>
-      )
-    }
-  ];
-
-  const certificateColumns = [
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type) => (
-        <div className="flex items-center">
-          <Key className="mr-2" />
-          {type}
-        </div>
-      )
-    },
-    {
-      title: 'Issued Date',
-      dataIndex: 'issuedDate',
-      key: 'issuedDate'
-    },
-    {
-      title: 'Expiration',
-      dataIndex: 'expirationDate',
-      key: 'expirationDate',
-      render: (date, record) => (
-        <span className={`
-          ${record.status === 'expired' ? 'text-red-500' : 'text-green-500'}
-        `}>
-          {date}
-        </span>
-      )
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record) => (
-        <div className="flex items-center space-x-2">
-          <Tooltip title="Rotate Certificate">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => handleRotateCertificate(record.id)}
-            >
-              <Lock className="mr-2" /> Rotate
-            </Button>
-          </Tooltip>
-        </div>
-      )
-    }
-  ];
-
-  const securityGroupColumns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name'
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description'
-    },
-    {
-      title: 'Rules Count',
-      dataIndex: 'rulesCount',
-      key: 'rulesCount'
-    }
-  ];
-
+  }
+  
+  if (error) {
+    return (
+      <ErrorState 
+        title="Failed to load security details"
+        message={error.message}
+      />
+    );
+  }
+  
+  if (!securityDetails) {
+    return (
+      <ErrorState 
+        title="No security details available"
+        message="Unable to retrieve security information for this virtual machine."
+      />
+    );
+  }
+  
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Security Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderSecurityStatus()}
-          
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Firewall Rules</h3>
-              <Table 
-                columns={firewallColumns}
-                dataSource={securityDetails.firewallRules}
-                loading={isLoading}
-                emptyText="No firewall rules found"
+    <div className="security-tab">
+      <Card 
+        title="SSH Keys" 
+        actions={
+          <Button 
+            variant="primary" 
+            size="small"
+            icon="plus"
+            onClick={() => setShowAddKeyModal(true)}
+          >
+            Add SSH Key
+          </Button>
+        }
+      >
+        <Table
+          columns={[
+            { key: 'name', header: 'Key Name' },
+            { key: 'fingerprint', header: 'Fingerprint' },
+            { key: 'addedAt', header: 'Added Date', render: (row) => formatDate(row.addedAt) },
+            { key: 'lastUsed', header: 'Last Used', render: (row) => row.lastUsed ? formatDate(row.lastUsed) : 'Never' },
+            { key: 'actions', header: 'Actions', render: (row) => (
+              <Button 
+                variant="icon" 
+                icon="trash"
+                onClick={() => handleDeleteSSHKey(row.id)}
+                title="Delete key"
               />
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-2">SSH Certificates</h3>
-              <Table 
-                columns={certificateColumns}
-                dataSource={securityDetails.sshCertificates}
-                loading={isLoading}
-                emptyText="No SSH certificates found"
+            )}
+          ]}
+          data={sshKeys}
+          emptyMessage="No SSH keys configured"
+        />
+      </Card>
+      
+      <Card 
+        title="SSH Certificates" 
+        actions={
+          <Button 
+            variant="primary" 
+            size="small"
+            icon="plus"
+            onClick={() => setShowGenerateCertModal(true)}
+          >
+            Generate Certificate
+          </Button>
+        }
+      >
+        {certificates.length > 0 ? (
+          <div className="certificates-grid">
+            {certificates.map(cert => (
+              <CertificateCard 
+                key={cert.id}
+                certificate={cert}
+                onRevoke={() => handleRevokeCertificate(cert.id)}
               />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-certificates">
+            <p>No SSH certificates configured</p>
+            <p className="hint-text">Certificates provide a more secure way to access your VM than password authentication</p>
+          </div>
+        )}
+      </Card>
+      
+      <Card 
+        title="Security Scans" 
+        actions={
+          <Button 
+            variant="primary" 
+            size="small"
+            icon="shield"
+            onClick={runSecurityScan}
+          >
+            Run Security Scan
+          </Button>
+        }
+      >
+        <Table
+          columns={[
+            { key: 'scanDate', header: 'Scan Date', render: (row) => formatDate(row.scanDate) },
+            { key: 'status', header: 'Status', render: (row) => (
+              <StatusBadge 
+                status={
+                  row.status === 'completed' 
+                    ? (row.vulnerabilities > 0 ? 'danger' : 'success')
+                    : row.status === 'in-progress' 
+                      ? 'warning' 
+                      : 'error'
+                } 
+                text={row.status}
+              />
+            )},
+            { key: 'vulnerabilities', header: 'Vulnerabilities', render: (row) => (
+              row.status === 'completed' 
+                ? `${row.criticalVulnerabilities} critical, ${row.vulnerabilities - row.criticalVulnerabilities} other`
+                : '-'
+            )},
+            { key: 'actions', header: 'Actions', render: (row) => (
+              <Button 
+                variant="text" 
+                disabled={row.status !== 'completed'}
+                onClick={() => {/* View scan details */}}
+              >
+                View Details
+              </Button>
+            )}
+          ]}
+          data={securityScans}
+          emptyMessage="No security scans have been run"
+        />
+      </Card>
+      
+      <Card title="Security Settings">
+        <div className="security-settings">
+          <div className="setting-item">
+            <div className="setting-label">Password Authentication</div>
+            <div className="setting-value">
+              <div className="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  id="password-auth" 
+                  checked={securityDetails.passwordAuth} 
+                  onChange={() => {
+                    updateVMSecurity(vm.id, {
+                      action: 'togglePasswordAuth',
+                      enabled: !securityDetails.passwordAuth
+                    }).then(result => {
+                      if (result.success) {
+                        setSecurityDetails(prev => ({
+                          ...prev,
+                          passwordAuth: !prev.passwordAuth
+                        }));
+                      }
+                    });
+                  }}
+                />
+                <label htmlFor="password-auth"></label>
+              </div>
+              <span>{securityDetails.passwordAuth ? 'Enabled' : 'Disabled'}</span>
             </div>
           </div>
-        </CardContent>
+          
+          <div className="setting-item">
+            <div className="setting-label">Root Login</div>
+            <div className="setting-value">
+              <div className="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  id="root-login" 
+                  checked={securityDetails.rootLogin} 
+                  onChange={() => {
+                    updateVMSecurity(vm.id, {
+                      action: 'toggleRootLogin',
+                      enabled: !securityDetails.rootLogin
+                    }).then(result => {
+                      if (result.success) {
+                        setSecurityDetails(prev => ({
+                          ...prev,
+                          rootLogin: !prev.rootLogin
+                        }));
+                      }
+                    });
+                  }}
+                />
+                <label htmlFor="root-login"></label>
+              </div>
+              <span>{securityDetails.rootLogin ? 'Enabled' : 'Disabled'}</span>
+            </div>
+          </div>
+          
+          <div className="setting-item">
+            <div className="setting-label">Automatic Security Updates</div>
+            <div className="setting-value">
+              <div className="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  id="auto-updates" 
+                  checked={securityDetails.autoUpdates} 
+                  onChange={() => {
+                    updateVMSecurity(vm.id, {
+                      action: 'toggleAutoUpdates',
+                      enabled: !securityDetails.autoUpdates
+                    }).then(result => {
+                      if (result.success) {
+                        setSecurityDetails(prev => ({
+                          ...prev,
+                          autoUpdates: !prev.autoUpdates
+                        }));
+                      }
+                    });
+                  }}
+                />
+                <label htmlFor="auto-updates"></label>
+              </div>
+              <span>{securityDetails.autoUpdates ? 'Enabled' : 'Disabled'}</span>
+            </div>
+          </div>
+        </div>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Security Groups</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table 
-            columns={securityGroupColumns}
-            dataSource={securityDetails.securityGroups}
-            loading={isLoading}
-            emptyText="No security groups found"
-          />
-        </CardContent>
-      </Card>
+      
+      {/* Add SSH Key Modal */}
+      {showAddKeyModal && (
+        <Modal
+          title="Add SSH Key"
+          onClose={() => {
+            setShowAddKeyModal(false);
+            setNewKeyName('');
+            setNewKeyValue('');
+          }}
+          size="medium"
+        >
+          <div className="form-group">
+            <label>Key Name</label>
+            <input 
+              type="text" 
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder="e.g., my-laptop-key"
+              className="form-control"
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Public Key</label>
+            <textarea 
+              value={newKeyValue}
+              onChange={(e) => setNewKeyValue(e.target.value)}
+              placeholder="Paste your SSH public key (starts with ssh-rsa or ssh-ed25519)"
+              className="form-control"
+              rows={5}
+            />
+          </div>
+          
+          <div className="modal-actions">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setShowAddKeyModal(false);
+                setNewKeyName('');
+                setNewKeyValue('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleAddSSHKey}
+              disabled={!newKeyName || !newKeyValue}
+            >
+              Add Key
+            </Button>
+          </div>
+        </Modal>
+      )}
+      
+      {/* Generate Certificate Modal */}
+      {showGenerateCertModal && (
+        <Modal
+          title="Generate SSH Certificate"
+          onClose={() => {
+            setShowGenerateCertModal(false);
+            setNewCertName('');
+          }}
+          size="small"
+        >
+          <div className="form-group">
+            <label>Certificate Name</label>
+            <input 
+              type="text" 
+              value={newCertName}
+              onChange={(e) => setNewCertName(e.target.value)}
+              placeholder="e.g., dev-laptop-cert"
+              className="form-control"
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Validity Period (Days)</label>
+            <input 
+              type="number" 
+              value={newCertValidity}
+              min="1"
+              max="365"
+              onChange={(e) => setNewCertValidity(parseInt(e.target.value))}
+              className="form-control"
+            />
+          </div>
+          
+          <div className="modal-actions">
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setShowGenerateCertModal(false);
+                setNewCertName('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleGenerateCertificate}
+              disabled={!newCertName}
+            >
+              Generate
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
