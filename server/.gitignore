@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+
+# Coverage directory
+coverage/
+
+# VSCode
+.vscode/
+
+# IntelliJ IDEA
+.idea/
+
+# MacOS
+.DS_Store
+
+# Local Netlify folder
+.netlify
+
+# Build
+dist/
