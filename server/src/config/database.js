@@ -1,23 +1,16 @@
 const mongoose = require('mongoose');
-const config = require('./index');
 const logger = require('../utils/logger');
+const config = require('./index');
 
-// Set mongoose options
-mongoose.set('debug', config.env === 'development');
-
-// Create database connection handler
 const connectDB = async () => {
   try {
-    const connection = await mongoose.connect(config.mongodb.uri, config.mongodb.options);
-    logger.info(`MongoDB connected: ${connection.connection.host}`);
-    return connection;
+    const conn = await mongoose.connect(config.mongoose.url, config.mongoose.options);
+    logger.info(`MongoDB Connected: ${conn.connection.host}`);
+    return conn;
   } catch (error) {
-    logger.error('MongoDB connection error:', error);
+    logger.error(`Error connecting to MongoDB: ${error.message}`);
     process.exit(1);
   }
 };
 
-// Export connection handler
-module.exports = {
-  connectDB,
-};
+module.exports = connectDB;

@@ -1,12 +1,12 @@
+// src/app.js
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
-const httpStatus = require('http-status');
-
+const routes = require('./api');
 const config = require('./config');
-const { errorHandler, errorConverter } = require('./middleware/error.middleware');
+const { errorConverter, errorHandler }= require('./middleware/error.middleware');
 
 const app = express();
 
@@ -19,37 +19,22 @@ app.use(express.json());
 // Parse URL-encoded request body
 app.use(express.urlencoded({ extended: true }));
 
-// Gzip compression
+// Compress response
 app.use(compression());
 
 // Enable CORS
-app.use(cors({ origin: config.cors.origin }));
+app.use(cors());
 
-// Request logging
-app.use(morgan('dev'));
+// Http request logger
+if (config.env !== 'test') {
+  app.use(morgan('dev'));
+}
 
 // API routes
-// app.use(`/api/${config.api.version}`, routes); // Sẽ được bổ sung sau
-
-// API routes
-const routes = require('./api');
 app.use('/api', routes);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(httpStatus.OK).send({ status: 'ok' });
-});
-
-// Handle 404
-app.use((req, res, next) => {
-  res.status(httpStatus.NOT_FOUND).json({
-    message: 'Not found',
-    status: httpStatus.NOT_FOUND,
-  });
-});
-
-// Convert error to ApiError, if needed
-app.use(errorConverter);
+// Health check
+app.get('/health', (req, res) => res.status(200).send({ status: 'ok' }));
 
 // Error handling
 app.use(errorHandler);

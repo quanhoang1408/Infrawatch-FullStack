@@ -1,47 +1,51 @@
 const app = require('./app');
 const config = require('./config');
 const logger = require('./utils/logger');
-const { connectDB } = require('./config/database');
+const connectDB = require('./config/database');
 
-// IIFE để sử dụng async/await
-(async () => {
-  try {
-    // Kết nối tới MongoDB
-    await connectDB();
-    
-    // Khởi động server
-    const server = app.listen(config.port, () => {
-      logger.info(`Server started on port ${config.port} (${config.env})`);
+let server;
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION! Shutting down...');
+  console.error('Error name:', err.name);
+  console.error('Error message:', err.message);
+  console.error('Stack trace:', err.stack);
+  process.exit(1);
+});
+
+// Connect to MongoDB and start server
+connectDB()
+  .then(() => {
+    server = app.listen(config.port, () => {
+      logger.info(`Server running on port ${config.port}`);
     });
+  })
+  .catch((err) => {
+    logger.error('Failed to connect to MongoDB', err);
+    process.exit(1);
+  });
 
-    // Xử lý lỗi không mong đợi
-    const unexpectedErrorHandler = (error) => {
-      logger.error(error);
-      if (server) {
-        server.close(() => {
-          logger.info('Server closed');
-          process.exit(1);
-        });
-      } else {
-        process.exit(1);
-      }
-    };
-
-    process.on('uncaughtException', unexpectedErrorHandler);
-    process.on('unhandledRejection', unexpectedErrorHandler);
-
-    // Xử lý shutdown
-    process.on('SIGTERM', () => {
-      logger.info('SIGTERM received');
-      if (server) {
-        server.close(() => {
-          logger.info('Server closed');
-          process.exit(0);
-        });
-      }
+// Handle unhandled rejections
+process.on('unhandledRejection', (err) => {
+  logger.error('UNHANDLED REJECTION! Shutting down...');
+  logger.error(err.name, err.message, err.stack);
+  if (server) {
+    server.close(() => {
+      process.exit(1);
     });
-  } catch (error) {
-    logger.error('Failed to start server:', error);
+  } else {
     process.exit(1);
   }
-})();
+});
+
+// Handle SIGTERM signal
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM RECEIVED. Shutting down gracefully');
+  if (server) {
+    server.close(() => {
+      logger.info('Process terminated!');
+      process.exit(0);
+    });
+  }
+});

@@ -1,13 +1,9 @@
+// src/api/v1/index.js
 const express = require('express');
+const authRoutes = require('./auth/auth.routes');
 
 const router = express.Router();
 
-// Status check route
-router.get('/status', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'API v1 is running',
-  });
-});
+router.use('/auth', authRoutes);
 
 module.exports = router;

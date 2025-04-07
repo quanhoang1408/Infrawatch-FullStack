@@ -1,33 +1,23 @@
 const httpStatus = require('http-status');
+const ApiError = require('../utils/errors/ApiError');
 const config = require('../config');
 const logger = require('../utils/logger');
-const { ApiError } = require('../utils/errors');
 
 /**
- * Error converter
- * @param {Error} err - Error object
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
+ * Convert error to ApiError if needed
  */
 const errorConverter = (err, req, res, next) => {
   let error = err;
-  
   if (!(error instanceof ApiError)) {
     const statusCode = error.statusCode || httpStatus.INTERNAL_SERVER_ERROR;
     const message = error.message || httpStatus[statusCode];
     error = new ApiError(statusCode, message, false, err.stack);
   }
-  
   next(error);
 };
 
 /**
  * Error handler
- * @param {Error} err - Error object
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
  */
 const errorHandler = (err, req, res, next) => {
   let { statusCode, message } = err;
@@ -49,7 +39,7 @@ const errorHandler = (err, req, res, next) => {
     logger.error(err);
   }
 
-  res.status(statusCode).json(response);
+  res.status(statusCode).send(response);
 };
 
 module.exports = {
