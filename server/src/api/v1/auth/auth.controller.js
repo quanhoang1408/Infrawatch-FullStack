@@ -7,7 +7,8 @@ const { asyncHandler } = require('../../../utils/asyncHandler');
  */
 const register = asyncHandler(async (req, res) => {
   const user = await authService.register(req.body);
-  res.status(201).send(user);
+  const tokens = await authService.generateTokens(user);
+  res.status(201).send({ user, tokens });
 });
 
 /**
@@ -24,8 +25,8 @@ const login = asyncHandler(async (req, res) => {
  */
 const refreshTokens = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
-  const { user, tokens } = await authService.refreshAuth(refreshToken);
-  res.send({ user, tokens });
+  const { tokens } = await authService.refreshAuth(refreshToken);
+  res.send(tokens);
 });
 
 /**
@@ -36,9 +37,17 @@ const logout = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+/**
+ * Lấy thông tin user hiện tại
+ */
+const getMe = asyncHandler(async (req, res) => {
+  res.send(req.user);
+});
+
 module.exports = {
   register,
   login,
   refreshTokens,
   logout,
+  getMe,
 };

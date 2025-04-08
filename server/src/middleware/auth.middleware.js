@@ -29,8 +29,10 @@ const auth = (requiredRoles = []) => {
         throw new ApiError(403, 'Not authorized');
       }
 
-      // Đính kèm user vào request
-      req.user = user;
+      // Đính kèm user vào request nhưng loại bỏ password
+      const userWithoutPassword = user.toObject();
+      delete userWithoutPassword.password;
+      req.user = userWithoutPassword;
       
       next();
     } catch (error) {
