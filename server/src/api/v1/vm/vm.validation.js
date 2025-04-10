@@ -14,7 +14,14 @@ const syncVMs = {
   }),
 };
 
+const vmAction = {
+  params: Joi.object().keys({
+    vmId: Joi.string().custom(objectId).required(),
+  }),
+};
+
 module.exports = {
   getVM,
   syncVMs,
+  vmAction,
 };

@@ -30,4 +30,28 @@ router
     vmController.getVM
   );
 
+router
+  .route('/:vmId/start')
+  .post(
+    auth(),
+    validate(vmValidation.vmAction),
+    vmController.startVM
+  );
+
+router
+  .route('/:vmId/stop')
+  .post(
+    auth(),
+    validate(vmValidation.vmAction),
+    vmController.stopVM
+  );
+
+router
+  .route('/:vmId/reboot')
+  .post(
+    auth(),
+    validate(vmValidation.vmAction),
+    vmController.rebootVM
+  );
+
 module.exports = router;

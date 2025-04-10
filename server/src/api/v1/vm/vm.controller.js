@@ -32,8 +32,41 @@ const syncVMs = asyncHandler(async (req, res) => {
   res.send(vms);
 });
 
+/**
+ * Start VM
+ */
+const startVM = asyncHandler(async (req, res) => {
+  await vmService.startVM(req.params.vmId, req.user._id);
+  res.status(202).send({
+    message: `Start request accepted for VM ${req.params.vmId}`,
+  });
+});
+
+/**
+ * Stop VM
+ */
+const stopVM = asyncHandler(async (req, res) => {
+  await vmService.stopVM(req.params.vmId, req.user._id);
+  res.status(202).send({
+    message: `Stop request accepted for VM ${req.params.vmId}`,
+  });
+});
+
+/**
+ * Reboot VM
+ */
+const rebootVM = asyncHandler(async (req, res) => {
+  await vmService.rebootVM(req.params.vmId, req.user._id);
+  res.status(202).send({
+    message: `Reboot request accepted for VM ${req.params.vmId}`,
+  });
+});
+
 module.exports = {
   getVMs,
   getVM,
   syncVMs,
+  startVM,
+  stopVM,
+  rebootVM,
 };

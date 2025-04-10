@@ -1,51 +1,44 @@
+// src/server.js
+const mongoose = require('mongoose');
 const app = require('./app');
 const config = require('./config');
-const logger = require('./utils/logger');
-const connectDB = require('./config/database');
+const { initJobs } = require('./jobs');
 
 let server;
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! Shutting down...');
-  console.error('Error name:', err.name);
-  console.error('Error message:', err.message);
-  console.error('Stack trace:', err.stack);
-  process.exit(1);
+mongoose.connect(config.mongodb.url, config.mongodb.options).then(() => {
+  console.log('Connected to MongoDB');
+  
+  // Initialize jobs
+  initJobs();
+  
+  server = app.listen(config.port, () => {
+    console.log(`Server listening on port ${config.port}`);
+  });
 });
 
-// Connect to MongoDB and start server
-connectDB()
-  .then(() => {
-    server = app.listen(config.port, () => {
-      logger.info(`Server running on port ${config.port}`);
-    });
-  })
-  .catch((err) => {
-    logger.error('Failed to connect to MongoDB', err);
-    process.exit(1);
-  });
-
-// Handle unhandled rejections
-process.on('unhandledRejection', (err) => {
-  logger.error('UNHANDLED REJECTION! Shutting down...');
-  logger.error(err.name, err.message, err.stack);
+const exitHandler = () => {
   if (server) {
     server.close(() => {
+      console.log('Server closed');
       process.exit(1);
     });
   } else {
     process.exit(1);
   }
-});
+};
 
-// Handle SIGTERM signal
+const unexpectedErrorHandler = (error) => {
+  console.error('Unexpected error:', error);
+  exitHandler();
+};
+
+process.on('uncaughtException', unexpectedErrorHandler);
+process.on('unhandledRejection', unexpectedErrorHandler);
+
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM RECEIVED. Shutting down gracefully');
+  console.log('SIGTERM received');
   if (server) {
-    server.close(() => {
-      logger.info('Process terminated!');
-      process.exit(0);
-    });
+    server.close();
   }
 });
