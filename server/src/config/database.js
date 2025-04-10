@@ -4,7 +4,7 @@ const config = require('./index');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(config.mongoose.url, config.mongoose.options);
+    const conn = await mongoose.connect(config.mongodb.url, config.mongodb.options);
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
     return conn;
   } catch (error) {

@@ -8,8 +8,11 @@ const enumerateErrorFormat = winston.format((info) => {
   return info;
 });
 
+// Default log level if config.logs.level is undefined
+const logLevel = config.logs?.level || 'info';
+
 const logger = winston.createLogger({
-  level: config.logs.level,
+  level: logLevel,
   format: winston.format.combine(
     enumerateErrorFormat(),
     config.env === 'development' ? winston.format.colorize() : winston.format.uncolorize(),
