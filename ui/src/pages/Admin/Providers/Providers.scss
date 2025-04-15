@@ -1,0 +1,46 @@
+@import '../../../styles/variables.scss';
+@import '../../../styles/mixins.scss';
+
+.providers {
+  &__header {
+    @include flex-between;
+    margin-bottom: $spacing-md;
+    
+    @include max-sm {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: $spacing-sm;
+    }
+  }
+  
+  &__title {
+    margin: 0;
+    font-size: $font-size-heading-3;
+  }
+  
+  &__actions {
+    display: flex;
+    gap: $spacing-sm;
+  }
+  
+  &__content {
+    margin-bottom: $spacing-lg;
+  }
+  
+  &__loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+  }
+  
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: $spacing-md;
+    
+    @include max-sm {
+      grid-template-columns: 1fr;
+    }
+  }
+}

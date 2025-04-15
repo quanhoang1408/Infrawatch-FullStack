@@ -1,181 +1,90 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
-import authService from '../services/auth.service';
-import { LOCAL_STORAGE_KEYS } from '../constants/storage.constants';
+import React, { createContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '../constants/routes.constants';
+import authService from '../services/auth.service';
+import { isAuthenticated, clearTokens } from '../utils/storage.utils';
 
-// Tạo context cho authentication
+// Create the context
 export const AuthContext = createContext();
 
-/**
- * AuthProvider component cung cấp trạng thái xác thực và các hàm liên quan
- * cho toàn bộ ứng dụng
- */
 export const AuthProvider = ({ children }) => {
-  // State quản lý thông tin user, token và trạng thái loading
-  const [currentUser, setCurrentUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
   const navigate = useNavigate();
 
-  // Kiểm tra xem user đã đăng nhập chưa
-  const isAuthenticated = !!token;
-
-  /**
-   * Khởi tạo auth state từ localStorage khi component được mount
-   */
+  // Check if user is already logged in on app load
   useEffect(() => {
     const initAuth = async () => {
-      try {
-        // Lấy token từ localStorage
-        const storedToken = localStorage.getItem(LOCAL_STORAGE_KEYS.TOKEN);
-        
-        if (storedToken) {
-          setToken(storedToken);
-          
-          // Lấy thông tin user từ localStorage hoặc từ API
-          const storedUser = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.USER));
-          
-          if (storedUser) {
-            setCurrentUser(storedUser);
-          } else {
-            // Nếu không có thông tin user trong localStorage, gọi API để lấy
-            const userInfo = await authService.getCurrentUser();
-            setCurrentUser(userInfo);
-            localStorage.setItem(LOCAL_STORAGE_KEYS.USER, JSON.stringify(userInfo));
-          }
+      if (isAuthenticated()) {
+        try {
+          const userData = await authService.getCurrentUser();
+          setUser(userData);
+        } catch (err) {
+          console.error('Failed to fetch user data:', err);
+          clearTokens();
         }
-      } catch (err) {
-        console.error('Error initializing auth:', err);
-        setError(err.message);
-        // Nếu có lỗi, xóa token và user từ localStorage
-        logout();
-      } finally {
-        setIsLoading(false);
       }
+      setLoading(false);
     };
 
     initAuth();
   }, []);
 
-  /**
-   * Thực hiện đăng nhập
-   * @param {string} email Email người dùng
-   * @param {string} password Mật khẩu
-   * @returns {Promise} Kết quả đăng nhập
-   */
-  const login = useCallback(async (email, password) => {
-    setIsLoading(true);
+  // Register user
+  const register = async (userData) => {
+    setLoading(true);
     setError(null);
-    
     try {
-      const response = await authService.login(email, password);
-      const { token, user } = response;
-      
-      // Lưu token và thông tin user vào localStorage
-      localStorage.setItem(LOCAL_STORAGE_KEYS.TOKEN, token);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.USER, JSON.stringify(user));
-      
-      // Cập nhật state
-      setToken(token);
-      setCurrentUser(user);
-      
-      return response;
+      const result = await authService.register(userData);
+      setUser(result.user);
+      setLoading(false);
+      return result;
     } catch (err) {
-      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+      setLoading(false);
+      setError(err.response?.data?.message || 'Registration failed');
       throw err;
-    } finally {
-      setIsLoading(false);
     }
-  }, []);
-
-  /**
-   * Thực hiện đăng ký
-   * @param {Object} userData Thông tin đăng ký
-   * @returns {Promise} Kết quả đăng ký
-   */
-  const register = useCallback(async (userData) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const response = await authService.register(userData);
-      return response;
-    } catch (err) {
-      setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  /**
-   * Thực hiện đăng xuất
-   */
-  const logout = useCallback(() => {
-    // Xóa token và thông tin user từ localStorage
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.TOKEN);
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.USER);
-    
-    // Reset state
-    setToken(null);
-    setCurrentUser(null);
-    
-    // Chuyển hướng về trang đăng nhập
-    navigate(ROUTES.LOGIN);
-  }, [navigate]);
-
-  /**
-   * Cập nhật thông tin người dùng
-   * @param {Object} updatedUser Thông tin người dùng đã cập nhật
-   */
-  const updateUser = useCallback((updatedUser) => {
-    setCurrentUser(prev => ({ ...prev, ...updatedUser }));
-    
-    // Cập nhật thông tin trong localStorage
-    const storedUser = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.USER));
-    if (storedUser) {
-      localStorage.setItem(
-        LOCAL_STORAGE_KEYS.USER, 
-        JSON.stringify({ ...storedUser, ...updatedUser })
-      );
-    }
-  }, []);
-
-  /**
-   * Kiểm tra xem người dùng có quyền truy cập tính năng không
-   * @param {string} permission Tên quyền cần kiểm tra
-   * @returns {boolean} Có quyền hay không
-   */
-  const hasPermission = useCallback((permission) => {
-    if (!currentUser || !currentUser.permissions) {
-      return false;
-    }
-    
-    return currentUser.permissions.includes(permission);
-  }, [currentUser]);
-
-  // Value object chứa tất cả state và functions sẽ được chia sẻ qua context
-  const contextValue = {
-    currentUser,
-    token,
-    isLoading,
-    error,
-    isAuthenticated,
-    login,
-    register,
-    logout,
-    updateUser,
-    hasPermission
   };
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  // Login user
+  const login = async (credentials) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await authService.login(credentials);
+      setUser(result.user);
+      setLoading(false);
+      return result;
+    } catch (err) {
+      setLoading(false);
+      setError(err.response?.data?.message || 'Login failed');
+      throw err;
+    }
+  };
 
-export default AuthContext;
+  // Logout user
+  const logout = async () => {
+    setLoading(true);
+    try {
+      await authService.logout();
+      setUser(null);
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const value = {
+    user,
+    loading,
+    error,
+    register,
+    login,
+    logout,
+    isAuthenticated: !!user,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};

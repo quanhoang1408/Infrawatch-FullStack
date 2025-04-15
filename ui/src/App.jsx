@@ -1,65 +1,61 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Spin } from 'antd';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
-import { ThemeProvider } from './context/ThemeContext';
-import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import AdminRoute from './components/common/AdminRoute';
+import ToastContainer from './components/feedback/ToastContainer';
+import { MainLayout } from './components/layout';
+
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import VMList from './pages/VMList';
-import VMDetail from './pages/VMDetail';
-import Terminal from './pages/Terminal';
-import Settings from './pages/Settings';
+import Providers from './pages/Admin/Providers';
 import NotFound from './pages/NotFound';
 
+// Styles
+import './styles/index.scss';
+
 const App = () => {
-  const [loading, setLoading] = useState(true);
-
-  // Simulate initial loading (e.g., checking auth status)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="Đang tải Infrawatch..." />
-      </div>
-    );
-  }
-
   return (
-    <ThemeProvider>
+    <Router>
       <AuthProvider>
         <NotificationProvider>
           <Routes>
+            {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             
-            <Route path="/" element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="vms" element={<VMList />} />
-              <Route path="vms/:id" element={<VMDetail />} />
-              <Route path="vms/:id/terminal" element={<Terminal />} />
-              <Route path="settings/*" element={<Settings />} />
+            {/* Protected routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<MainLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/vm" element={<VMList />} />
+                
+                {/* Admin routes */}
+                <Route element={<AdminRoute />}>
+                  <Route path="/admin/providers" element={<Providers />} />
+                  {/* Add more admin routes here in the future */}
+                </Route>
+                
+                {/* Add more protected routes here in the future */}
+              </Route>
             </Route>
             
+            {/* Redirect root to dashboard */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Not found route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          
+          {/* Toast notifications */}
+          <ToastContainer />
         </NotificationProvider>
       </AuthProvider>
-    </ThemeProvider>
+    </Router>
   );
 };
 

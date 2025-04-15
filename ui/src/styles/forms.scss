@@ -1,0 +1,138 @@
+@import './variables.scss';
+@import './mixins.scss';
+
+.form {
+  &__group {
+    margin-bottom: $spacing-md;
+  }
+  
+  &__label {
+    display: block;
+    margin-bottom: $spacing-xs;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: var(--text-secondary);
+  }
+  
+  &__input {
+    display: block;
+    width: 100%;
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-md;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-medium);
+    border-radius: $border-radius-sm;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    
+    @include input-focus;
+    
+    &::placeholder {
+      color: var(--text-tertiary);
+    }
+    
+    &:disabled {
+      background-color: var(--bg-tertiary);
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    
+    &.has-error {
+      border-color: var(--error);
+      
+      &:focus {
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+      }
+    }
+  }
+  
+  &__error {
+    display: block;
+    margin-top: $spacing-xxs;
+    font-size: $font-size-xs;
+    color: var(--error);
+  }
+  
+  &__hint {
+    display: block;
+    margin-top: $spacing-xxs;
+    font-size: $font-size-xs;
+    color: var(--text-tertiary);
+  }
+  
+  &__check {
+    display: flex;
+    align-items: center;
+    margin-bottom: $spacing-sm;
+    
+    input[type="checkbox"], 
+    input[type="radio"] {
+      margin-right: $spacing-xs;
+    }
+    
+    label {
+      font-size: $font-size-sm;
+    }
+  }
+  
+  &__submit {
+    margin-top: $spacing-md;
+  }
+  
+  &__divider {
+    display: flex;
+    align-items: center;
+    margin: $spacing-md 0;
+    
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background-color: var(--border-light);
+    }
+    
+    span {
+      padding: 0 $spacing-sm;
+      font-size: $font-size-sm;
+      color: var(--text-tertiary);
+    }
+  }
+}
+
+// Auth form specific styles
+.auth-form {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: $spacing-lg;
+  background-color: var(--bg-primary);
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-md;
+  
+  &__header {
+    margin-bottom: $spacing-lg;
+    text-align: center;
+    
+    h2 {
+      margin-bottom: $spacing-xs;
+    }
+    
+    p {
+      color: var(--text-tertiary);
+      font-size: $font-size-sm;
+    }
+  }
+  
+  &__footer {
+    margin-top: $spacing-lg;
+    text-align: center;
+    font-size: $font-size-sm;
+    color: var(--text-tertiary);
+    
+    a {
+      font-weight: $font-weight-medium;
+    }
+  }
+}

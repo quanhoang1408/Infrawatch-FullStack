@@ -1,63 +1,79 @@
 import axios from 'axios';
-import { message } from 'antd';
+import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../utils/storage.utils';
 
-// Create axios instance with default config
+// Make sure the URL points to the correct backend server
+// Should be defined in .env files for different environments
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1';
+
+// Log the API URL in development
+if (process.env.NODE_ENV === 'development') {
+  console.log('API Base URL:', baseURL);
+}
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000, // 15 seconds
 });
 
-// Add token to requests if it exists
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Request interceptor for adding auth token
+api.interceptors.request.use(
+  (config) => {
+    // In development, log requests
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+    }
+    
+    const token = getAccessToken();
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-// Handle token expiration
+// Response interceptor for handling token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const originalRequest = error.config;
     
-    // If no response from server
-    if (!error.response) {
-      message.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.');
+    // If error is not 401 or request has already been retried, reject
+    if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
-    
-    // Handle 401 errors (unauthorized)
-    if (error.response.status === 401 && !originalRequest._retry) {
-      // Avoid infinite loops - only retry once
-      originalRequest._retry = true;
 
-      // If not on login page, redirect to login
-      if (window.location.pathname !== '/login') {
-        localStorage.removeItem('token');
-        message.error('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
-        window.location.href = '/login';
+    // Attempt to refresh the token
+    originalRequest._retry = true;
+    try {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        // No refresh token available, clear tokens and reject
+        clearTokens();
+        return Promise.reject(error);
       }
+
+      const response = await axios.post(`${baseURL}/auth/refresh-tokens`, {
+        refreshToken,
+      });
+
+      const { access, refresh } = response.data;
+      
+      // Save new tokens
+      setTokens(access.token, refresh.token);
+      
+      // Update the authorization header
+      originalRequest.headers['Authorization'] = `Bearer ${access.token}`;
+      
+      // Retry the original request
+      return api(originalRequest);
+    } catch (refreshError) {
+      // Clear tokens on refresh failure
+      clearTokens();
+      return Promise.reject(refreshError);
     }
-    
-    // Handle other common errors
-    if (error.response.status === 403) {
-      message.error('Bạn không có quyền thực hiện hành động này');
-    }
-    
-    if (error.response.status === 404) {
-      message.error('Không tìm thấy tài nguyên yêu cầu');
-    }
-    
-    if (error.response.status === 500) {
-      message.error('Lỗi máy chủ. Vui lòng thử lại sau');
-    }
-    
-    return Promise.reject(error);
   }
 );
 

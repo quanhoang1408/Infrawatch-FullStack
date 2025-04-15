@@ -1,33 +1,6 @@
-// Main style entry point
-
 @import './variables.scss';
 @import './mixins.scss';
 @import './global.scss';
-
-// Theme imports
-@import './themes/light.scss';
-@import './themes/dark.scss';
-
-// Import component-specific styles if needed
-// @import '../components/layout/MainLayout.scss';
-// @import '../pages/Login/Login.scss';
-
-// Import Ant Design styles
-@import '~antd/dist/antd.css';
-
-// Override Ant Design styles
-.ant-layout {
-  background: var(--background-color);
-}
-
-.ant-layout-header {
-  background: var(--header-background);
-}
-
-.ant-layout-sider {
-  background: var(--sidebar-background);
-}
-
-.ant-layout-content {
-  background: var(--content-background);
-}
+@import './typography.scss';
+@import './buttons.scss';
+@import './forms.scss';

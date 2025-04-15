@@ -1,60 +1,44 @@
-// MainLayout.scss
-.iw-main-layout {
+@import '../../styles/variables.scss';
+@import '../../styles/mixins.scss';
+
+.main-layout {
+  display: flex;
+  min-height: 100vh;
+  
+  &__content {
+    flex: 1;
     display: flex;
-    min-height: 100vh;
-    position: relative;
-    background-color: var(--bg-color-base);
-    color: var(--text-color-primary);
+    flex-direction: column;
+    transition: margin-left 0.3s ease;
+  }
+  
+  &__main {
+    flex: 1;
+    padding: $spacing-lg;
+    background-color: var(--bg-secondary);
+    min-height: calc(100vh - #{$header-height});
     
-    &--collapsed {
-      .iw-sidebar {
-        width: 64px;
-        
-        &__logo-text {
-          display: none;
-        }
-        
-        &__user-info {
-          display: none;
-        }
-        
-        &__menu-title {
-          display: none;
-        }
-        
-        &__menu-item-text {
-          display: none;
-        }
-      }
-      
-      .iw-main-layout__content {
-        margin-left: 64px;
-      }
-    }
-    
-    &__content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      margin-left: 240px;
-      transition: margin-left 0.3s ease;
-    }
-    
-    &__main {
-      flex: 1;
-      padding: 24px;
-      overflow-y: auto;
-      
-      @media (max-width: 768px) {
-        padding: 16px;
-      }
+    @include max-md {
+      padding: $spacing-md;
     }
   }
   
-  .iw-loading-layout {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background-color: var(--bg-color-base);
+  &.sidebar-collapsed {
+    .sidebar {
+      width: 60px;
+      
+      &__logo-text {
+        display: none;
+      }
+      
+      &__item-text {
+        display: none;
+      }
+      
+      &__item {
+        padding: $spacing-sm;
+        justify-content: center;
+      }
+    }
   }
+}

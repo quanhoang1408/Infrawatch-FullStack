@@ -1,55 +1,66 @@
-// VMStatusBadge.jsx
 import React from 'react';
-import PropTypes from 'prop-types';
-import { StatusBadge } from '../common';
+import './VMStatusBadge.scss';
 
-/**
- * Component to display VM status with appropriate styling
- * @param {string} status - VM status
- */
-const VMStatusBadge = ({
-  status,
-  className = '',
-  ...rest
-}) => {
-  // Map VM status to badge type
-  const getBadgeType = (status) => {
-    const statusMap = {
-      'running': 'success',
-      'stopped': 'default',
-      'creating': 'warning',
-      'starting': 'warning',
-      'stopping': 'warning',
-      'restarting': 'warning',
-      'terminating': 'error',
-      'terminated': 'error',
-      'error': 'error'
-    };
-    
-    return statusMap[status] || 'default';
+const VMStatusBadge = ({ status }) => {
+  const getStatusClass = () => {
+    switch (status.toLowerCase()) {
+      case 'running':
+        return 'vm-status--success';
+      case 'stopped':
+        return 'vm-status--error';
+      case 'pending':
+      case 'stopping':
+      case 'starting':
+        return 'vm-status--warning';
+      case 'terminated':
+        return 'vm-status--danger';
+      default:
+        return 'vm-status--neutral';
+    }
   };
-  
-  // Format status text for display
-  const formatStatus = (status) => {
-    if (!status) return 'Unknown';
-    
-    // Capitalize first letter of status
-    return status.charAt(0).toUpperCase() + status.slice(1);
+
+  const getStatusIcon = () => {
+    switch (status.toLowerCase()) {
+      case 'running':
+        return (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" fill="currentColor" />
+          </svg>
+        );
+      case 'stopped':
+        return (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" fill="currentColor" />
+            <path d="M8 12H16" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        );
+      case 'pending':
+      case 'stopping':
+      case 'starting':
+        return (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" fill="currentColor" />
+            <path d="M12 16V12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 8H12.01" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        );
+      default:
+        return (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" fill="currentColor" />
+            <path d="M12 16V12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 8H12.01" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        );
+    }
   };
-  
+
   return (
-    <StatusBadge
-      status={formatStatus(status)}
-      type={getBadgeType(status)}
-      className={className}
-      {...rest}
-    />
+    <div className={`vm-status ${getStatusClass()}`}>
+      <span className="vm-status__icon">{getStatusIcon()}</span>
+      <span className="vm-status__text">{status}</span>
+    </div>
   );
-};
-
-VMStatusBadge.propTypes = {
-  status: PropTypes.string,
-  className: PropTypes.string
 };
 
 export default VMStatusBadge;

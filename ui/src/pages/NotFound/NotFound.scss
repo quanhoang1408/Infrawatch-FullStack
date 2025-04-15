@@ -1,18 +1,46 @@
 @import '../../styles/variables.scss';
 @import '../../styles/mixins.scss';
 
-.not-found-container {
+.not-found {
+  height: 100vh;
   @include flex-center;
-  min-height: 500px;
-  padding: $content-padding;
+  background-color: var(--bg-secondary);
   
-  .ant-result {
-    .ant-result-title {
-      color: var(--text-color);
-    }
+  &__content {
+    max-width: 500px;
+    text-align: center;
+    padding: $spacing-lg;
+  }
+  
+  &__code {
+    font-size: 100px;
+    font-weight: $font-weight-bold;
+    color: var(--primary-color);
+    margin: 0;
+    line-height: 1;
+  }
+  
+  &__title {
+    font-size: $font-size-heading-2;
+    margin: $spacing-sm 0;
+  }
+  
+  &__message {
+    color: var(--text-secondary);
+    margin-bottom: $spacing-lg;
+  }
+  
+  &__actions {
+    @include flex-center;
+    gap: $spacing-md;
     
-    .ant-result-subtitle {
-      color: var(--text-color-secondary);
+    @include max-sm {
+      flex-direction: column;
+      width: 100%;
+      
+      .btn {
+        width: 100%;
+      }
     }
   }
 }

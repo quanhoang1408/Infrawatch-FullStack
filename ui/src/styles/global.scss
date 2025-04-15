@@ -1,10 +1,10 @@
-// Global styles
-
 @import './variables.scss';
 @import './mixins.scss';
 
-// Reset
-* {
+/* Base Resets */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -12,133 +12,104 @@
 
 html, body {
   height: 100%;
-  font-family: $font-family;
-  font-size: $font-size-base;
-  line-height: $line-height-base;
-  color: $text-color;
-  background-color: $background-color;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-size: $font-size-md;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: $font-weight-semibold;
+  line-height: 1.2;
+  margin-bottom: $spacing-md;
+}
+
+h1 {
+  font-size: $font-size-heading-1;
+}
+
+h2 {
+  font-size: $font-size-heading-2;
+}
+
+h3 {
+  font-size: $font-size-heading-3;
+}
+
+h4 {
+  font-size: $font-size-heading-4;
+}
+
+p {
+  margin-bottom: $spacing-md;
+}
+
 a {
-  color: $primary-color;
+  color: var(--primary-color);
   text-decoration: none;
-  @include transition(color);
   
   &:hover {
-    color: $primary-color-dark;
+    text-decoration: underline;
   }
 }
 
-// Common container classes
+/* Forms */
+input, textarea, select, button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Utility Classes */
 .container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 16px;
+  @include container;
 }
 
-.loading-container {
-  @include flex-center;
-  min-height: 200px;
-  width: 100%;
-}
-
-.error-container {
-  @include flex-column;
-  @include flex-center;
-  min-height: 200px;
-  width: 100%;
+.text-center {
   text-align: center;
-  
-  p {
-    margin-bottom: 16px;
-    color: $error-color;
-  }
 }
 
-.page-container {
-  @include responsive-padding;
-}
+.mt-1 { margin-top: $spacing-xs; }
+.mt-2 { margin-top: $spacing-sm; }
+.mt-3 { margin-top: $spacing-md; }
+.mt-4 { margin-top: $spacing-lg; }
+.mt-5 { margin-top: $spacing-xl; }
 
-// Page transition animations
-.page-enter {
-  opacity: 0;
-  transform: translateY(10px);
-}
+.mb-1 { margin-bottom: $spacing-xs; }
+.mb-2 { margin-bottom: $spacing-sm; }
+.mb-3 { margin-bottom: $spacing-md; }
+.mb-4 { margin-bottom: $spacing-lg; }
+.mb-5 { margin-bottom: $spacing-xl; }
 
-.page-enter-active {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 300ms, transform 300ms;
-}
+.ml-1 { margin-left: $spacing-xs; }
+.ml-2 { margin-left: $spacing-sm; }
+.ml-3 { margin-left: $spacing-md; }
+.ml-4 { margin-left: $spacing-lg; }
+.ml-5 { margin-left: $spacing-xl; }
 
-.page-exit {
-  opacity: 1;
-  transform: translateY(0);
-}
+.mr-1 { margin-right: $spacing-xs; }
+.mr-2 { margin-right: $spacing-sm; }
+.mr-3 { margin-right: $spacing-md; }
+.mr-4 { margin-right: $spacing-lg; }
+.mr-5 { margin-right: $spacing-xl; }
 
-.page-exit-active {
-  opacity: 0;
-  transform: translateY(-10px);
-  transition: opacity 300ms, transform 300ms;
-}
+.p-1 { padding: $spacing-xs; }
+.p-2 { padding: $spacing-sm; }
+.p-3 { padding: $spacing-md; }
+.p-4 { padding: $spacing-lg; }
+.p-5 { padding: $spacing-xl; }
 
-// Custom scrollbar
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
-
-// Card styles
-.card-hoverable {
-  @include card-hover;
-}
-
-// Antd overrides
-.ant-card {
-  border-radius: $border-radius-base;
-  overflow: hidden;
-}
-
-.ant-btn {
-  border-radius: $border-radius-base;
-}
-
-.ant-input, .ant-input-password {
-  border-radius: $border-radius-base;
-}
-
-// Dark mode overrides for Antd components
-.dark-theme {
-  background-color: $dark-background;
-  color: $dark-text-color;
-  
-  ::-webkit-scrollbar-track {
-    background: #2a2a2a;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #444;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #555;
-  }
-  
-  // You can add more dark theme overrides here
-}
+/* Dark mode styles will be added later */

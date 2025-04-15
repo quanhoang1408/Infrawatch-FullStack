@@ -1,174 +1,128 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import notificationService from '../services/notification.service';
-import { NOTIFICATION_TYPES, NOTIFICATION_TIMEOUT } from '../constants/notification.constants';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { toast } from '../components/feedback/ToastContainer';
 
-// Tạo context cho thông báo
-export const NotificationContext = createContext();
+// Create context
+const NotificationContext = createContext();
 
-/**
- * NotificationProvider cung cấp hệ thống quản lý thông báo cho toàn bộ ứng dụng
- * Bao gồm các loại thông báo: success, error, warning, info
- */
+// Custom hook to use notification context
+export const useNotification = () => {
+  const context = useContext(NotificationContext);
+  if (!context) {
+    throw new Error('useNotification must be used within a NotificationProvider');
+  }
+  return context;
+};
+
+// Provider component
 export const NotificationProvider = ({ children }) => {
-  // State lưu trữ danh sách các thông báo hiện tại
   const [notifications, setNotifications] = useState([]);
-  // State cho thông báo hệ thống (từ server)
-  const [systemNotifications, setSystemNotifications] = useState([]);
-  // State cho số lượng thông báo chưa đọc
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  /**
-   * Thêm một thông báo mới vào danh sách
-   * @param {string} message Nội dung thông báo
-   * @param {string} type Loại thông báo (success, error, warning, info)
-   * @param {number} timeout Thời gian hiển thị (ms), mặc định theo NOTIFICATION_TIMEOUT
-   * @param {boolean} isAutoClose Có tự động đóng không
-   */
-  const addNotification = useCallback((message, type = NOTIFICATION_TYPES.INFO, timeout = NOTIFICATION_TIMEOUT, isAutoClose = true) => {
-    const id = uuidv4();
+  // Add a new notification
+  const addNotification = useCallback((notification) => {
+    const id = Date.now().toString();
+    const newNotification = {
+      id,
+      ...notification,
+      timestamp: new Date(),
+      read: false
+    };
     
-    // Thêm thông báo mới vào danh sách
-    setNotifications(prev => [
-      ...prev,
-      {
-        id,
-        message,
-        type,
-        timestamp: new Date(),
-        isAutoClose
-      }
-    ]);
-
-    // Tự động xóa thông báo sau khoảng thời gian timeout nếu isAutoClose = true
-    if (isAutoClose) {
-      setTimeout(() => {
-        removeNotification(id);
-      }, timeout);
+    setNotifications(prev => [newNotification, ...prev]);
+    
+    // Also show as toast if specified
+    if (notification.showToast !== false) {
+      const type = notification.type || 'info';
+      toast[type](notification.message, notification.duration);
     }
-
+    
     return id;
   }, []);
 
-  /**
-   * Xóa một thông báo khỏi danh sách dựa vào id
-   * @param {string} id ID của thông báo cần xóa
-   */
-  const removeNotification = useCallback((id) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  // Show success notification
+  const showSuccess = useCallback((message, options = {}) => {
+    return addNotification({
+      message,
+      type: 'success',
+      ...options
+    });
+  }, [addNotification]);
+
+  // Show error notification
+  const showError = useCallback((message, options = {}) => {
+    return addNotification({
+      message,
+      type: 'error',
+      ...options
+    });
+  }, [addNotification]);
+
+  // Show info notification
+  const showInfo = useCallback((message, options = {}) => {
+    return addNotification({
+      message,
+      type: 'info',
+      ...options
+    });
+  }, [addNotification]);
+
+  // Show warning notification
+  const showWarning = useCallback((message, options = {}) => {
+    return addNotification({
+      message,
+      type: 'warning',
+      ...options
+    });
+  }, [addNotification]);
+
+  // Mark notification as read
+  const markAsRead = useCallback((id) => {
+    setNotifications(prev =>
+      prev.map(notification =>
+        notification.id === id
+          ? { ...notification, read: true }
+          : notification
+      )
+    );
   }, []);
 
-  /**
-   * Helper functions cho các loại thông báo cụ thể
-   */
-  const showSuccess = useCallback((message, timeout) => {
-    return addNotification(message, NOTIFICATION_TYPES.SUCCESS, timeout);
-  }, [addNotification]);
+  // Mark all notifications as read
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev =>
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+  }, []);
 
-  const showError = useCallback((message, timeout) => {
-    return addNotification(message, NOTIFICATION_TYPES.ERROR, timeout);
-  }, [addNotification]);
+  // Remove a notification
+  const removeNotification = useCallback((id) => {
+    setNotifications(prev => 
+      prev.filter(notification => notification.id !== id)
+    );
+  }, []);
 
-  const showWarning = useCallback((message, timeout) => {
-    return addNotification(message, NOTIFICATION_TYPES.WARNING, timeout);
-  }, [addNotification]);
-
-  const showInfo = useCallback((message, timeout) => {
-    return addNotification(message, NOTIFICATION_TYPES.INFO, timeout);
-  }, [addNotification]);
-
-  /**
-   * Xóa tất cả các thông báo
-   */
-  const clearAllNotifications = useCallback(() => {
+  // Clear all notifications
+  const clearAll = useCallback(() => {
     setNotifications([]);
   }, []);
 
-  /**
-   * Đánh dấu tất cả thông báo hệ thống là đã đọc
-   */
-  const markAllAsRead = useCallback(async () => {
-    try {
-      await notificationService.markAllAsRead();
-      setSystemNotifications(prev => 
-        prev.map(notification => ({ ...notification, isRead: true }))
-      );
-      setUnreadCount(0);
-    } catch (error) {
-      console.error('Error marking notifications as read:', error);
-    }
-  }, []);
+  // Get unread notifications count
+  const unreadCount = notifications.filter(notification => !notification.read).length;
 
-  /**
-   * Đánh dấu một thông báo là đã đọc
-   * @param {string} id ID của thông báo cần đánh dấu
-   */
-  const markAsRead = useCallback(async (id) => {
-    try {
-      await notificationService.markAsRead(id);
-      setSystemNotifications(prev => 
-        prev.map(notification => 
-          notification.id === id 
-            ? { ...notification, isRead: true } 
-            : notification
-        )
-      );
-      
-      // Cập nhật số lượng thông báo chưa đọc
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error(`Error marking notification ${id} as read:`, error);
-    }
-  }, []);
-
-  /**
-   * Lấy thông báo hệ thống từ server
-   */
-  const fetchSystemNotifications = useCallback(async () => {
-    try {
-      const { notifications, unreadCount } = await notificationService.getNotifications();
-      setSystemNotifications(notifications);
-      setUnreadCount(unreadCount);
-    } catch (error) {
-      console.error('Error fetching system notifications:', error);
-    }
-  }, []);
-
-  // Lấy thông báo hệ thống khi component được mount
-  useEffect(() => {
-    fetchSystemNotifications();
-    
-    // Thiết lập polling để lấy thông báo mới định kỳ (mỗi 30 giây)
-    const intervalId = setInterval(() => {
-      fetchSystemNotifications();
-    }, 30000);
-    
-    // Cleanup interval khi component unmount
-    return () => clearInterval(intervalId);
-  }, [fetchSystemNotifications]);
-
-  // Value object chứa tất cả state và functions sẽ được chia sẻ qua context
-  const contextValue = {
-    // UI Notifications
+  const value = {
     notifications,
+    unreadCount,
     addNotification,
-    removeNotification,
     showSuccess,
     showError,
-    showWarning,
     showInfo,
-    clearAllNotifications,
-    
-    // System Notifications
-    systemNotifications,
-    unreadCount,
-    markAllAsRead,
+    showWarning,
     markAsRead,
-    fetchSystemNotifications
+    markAllAsRead,
+    removeNotification,
+    clearAll
   };
 
   return (
-    <NotificationContext.Provider value={contextValue}>
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );

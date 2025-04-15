@@ -1,0 +1,50 @@
+@import '../../styles/variables.scss';
+@import '../../styles/mixins.scss';
+
+.vm-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px $spacing-xs;
+  border-radius: $border-radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  
+  &__icon {
+    display: inline-flex;
+    margin-right: 4px;
+  }
+  
+  &__text {
+    text-transform: capitalize;
+  }
+  
+  &--success {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+  }
+  
+  &--warning {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+  }
+  
+  &--error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+  }
+  
+  &--danger {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+  }
+  
+  &--info {
+    background-color: rgba(59, 130, 246, 0.1);
+    color: var(--info);
+  }
+  
+  &--neutral {
+    background-color: rgba(113, 128, 150, 0.1);
+    color: var(--text-tertiary);
+  }
+}

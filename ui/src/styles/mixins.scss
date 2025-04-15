@@ -1,124 +1,158 @@
-// Useful SCSS mixins
-
 @import './variables.scss';
 
-// Media queries
-@mixin mobile {
-  @media (max-width: #{$screen-sm - 1px}) {
+// Responsive breakpoints
+@mixin xs {
+  @media (min-width: #{$breakpoint-xs}) {
     @content;
   }
 }
 
-@mixin tablet {
-  @media (min-width: #{$screen-sm}) and (max-width: #{$screen-lg - 1px}) {
+@mixin sm {
+  @media (min-width: #{$breakpoint-sm}) {
     @content;
   }
 }
 
-@mixin desktop {
-  @media (min-width: #{$screen-lg}) {
+@mixin md {
+  @media (min-width: #{$breakpoint-md}) {
     @content;
   }
 }
 
-// Flexbox layouts
+@mixin lg {
+  @media (min-width: #{$breakpoint-lg}) {
+    @content;
+  }
+}
+
+@mixin xl {
+  @media (min-width: #{$breakpoint-xl}) {
+    @content;
+  }
+}
+
+@mixin xxl {
+  @media (min-width: #{$breakpoint-xxl}) {
+    @content;
+  }
+}
+
+// Max-width breakpoints
+@mixin max-xs {
+  @media (max-width: #{$breakpoint-xs - 1px}) {
+    @content;
+  }
+}
+
+@mixin max-sm {
+  @media (max-width: #{$breakpoint-sm - 1px}) {
+    @content;
+  }
+}
+
+@mixin max-md {
+  @media (max-width: #{$breakpoint-md - 1px}) {
+    @content;
+  }
+}
+
+@mixin max-lg {
+  @media (max-width: #{$breakpoint-lg - 1px}) {
+    @content;
+  }
+}
+
+@mixin max-xl {
+  @media (max-width: #{$breakpoint-xl - 1px}) {
+    @content;
+  }
+}
+
+// Flexbox helpers
+@mixin flex($direction: row, $justify: flex-start, $align: stretch, $wrap: nowrap) {
+  display: flex;
+  flex-direction: $direction;
+  justify-content: $justify;
+  align-items: $align;
+  flex-wrap: $wrap;
+}
+
 @mixin flex-center {
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
 }
 
 @mixin flex-between {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-}
-
-@mixin flex-column {
-  display: flex;
-  flex-direction: column;
-}
-
-@mixin flex-column-center {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
 }
 
-// Box shadow
-@mixin box-shadow($level: 1) {
-  @if $level == 1 {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  } @else if $level == 2 {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  } @else if $level == 3 {
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-  } @else if $level == 4 {
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
-  }
+// Typography
+@mixin text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-// Truncate text
-@mixin truncate($lines: 1) {
-  @if $lines == 1 {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  } @else {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: $lines;
-    -webkit-box-orient: vertical;
-    line-clamp: $lines;
-  }
+@mixin line-clamp($lines) {
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-// Transitions
-@mixin transition($property: all, $duration: $animation-duration-base, $timing: ease-in-out) {
+// Other helpers
+@mixin absolute-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@mixin transition($property: all, $duration: 0.3s, $timing: ease) {
   transition: $property $duration $timing;
 }
 
-// Gradient text
-@mixin gradient-text($gradient) {
-  background: $gradient;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  display: inline-block;
+@mixin card {
+  background-color: var(--bg-primary);
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-sm;
+  padding: $spacing-md;
 }
 
-// Glassmorphism effect
-@mixin glassmorphism($opacity: 0.8, $blur: 10px) {
-  backdrop-filter: blur($blur);
-  -webkit-backdrop-filter: blur($blur);
-  background-color: rgba(255, 255, 255, $opacity);
-  @include box-shadow(1);
-}
-
-// Dark glassmorphism
-@mixin dark-glassmorphism($opacity: 0.7, $blur: 10px) {
-  backdrop-filter: blur($blur);
-  -webkit-backdrop-filter: blur($blur);
-  background-color: rgba(0, 0, 0, $opacity);
-  @include box-shadow(1);
-}
-
-// Responsive padding
-@mixin responsive-padding {
-  padding: 24px;
-  
-  @include mobile {
-    padding: 16px;
+@mixin input-focus {
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(36, 99, 235, 0.25);
   }
 }
 
-// Hover effect for cards
-@mixin card-hover {
-  @include transition(transform, 0.3s);
+// Animations
+@mixin animation($name, $duration: 1s, $timing: ease, $iteration: 1) {
+  animation: $name $duration $timing $iteration;
+}
+
+// Container with max-width and center
+@mixin container {
+  width: 100%;
+  max-width: $container-max-width;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: $spacing-md;
+  padding-right: $spacing-md;
   
-  &:hover {
-    transform: translateY(-5px);
+  @include md {
+    padding-left: $spacing-lg;
+    padding-right: $spacing-lg;
   }
+}
+
+// Grid system
+@mixin grid($columns: 12, $gap: $spacing-md) {
+  display: grid;
+  grid-template-columns: repeat($columns, 1fr);
+  gap: $gap;
 }

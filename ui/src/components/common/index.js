@@ -1,4 +1,5 @@
 // index.js (exports all common components)
+import AdminRoute from './AdminRoute';
 import Button from './Button';
 import Card from './Card';
 import Dropdown from './Dropdown';
@@ -16,24 +17,7 @@ import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 
 export {
-  Button,
-  Card,
-  Dropdown,
-  Modal,
-  Notification,
-  NotificationPanel,
-  ProtectedRoute,
-  Search,
-  Spinner,
-  StatusBadge,
-  Tooltip,
-  Table,
-  Tabs,
-  EmptyState,
-  ErrorState
-};
-
-export default {
+  AdminRoute,
   Button,
   Card,
   Dropdown,

@@ -1,39 +1,28 @@
 import React from 'react';
-import { Button, Result } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import './NotFound.scss';
 
-/**
- * Not found page component
- */
 const NotFound = () => {
-  const navigate = useNavigate();
-
-  // Handle back button click
-  const handleBack = () => {
-    navigate(-1);
-  };
-
-  // Handle home button click
-  const handleHome = () => {
-    navigate('/');
-  };
-
   return (
-    <div className="not-found-container">
-      <Result
-        status="404"
-        title="404"
-        subTitle="Xin lỗi, trang bạn truy cập không tồn tại."
-        extra={[
-          <Button type="primary" key="home" onClick={handleHome}>
-            Trang chủ
-          </Button>,
-          <Button key="back" onClick={handleBack}>
-            Quay lại
-          </Button>,
-        ]}
-      />
+    <div className="not-found">
+      <div className="not-found__content">
+        <h1 className="not-found__code">404</h1>
+        <h2 className="not-found__title">Page Not Found</h2>
+        <p className="not-found__message">
+          The page you are looking for doesn't exist or has been moved.
+        </p>
+        <div className="not-found__actions">
+          <Link to="/" className="btn btn--primary">
+            Go Home
+          </Link>
+          <button 
+            onClick={() => window.history.back()} 
+            className="btn btn--outline-primary"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
