@@ -1,0 +1,19 @@
+[Server]
+# Backend server URL (required)
+url = http://localhost:3000
+# VM ID from Infrawatch (required)
+vm_id = 67f79c0402f360cda29de743
+# Agent token for authentication (required)
+agent_token = 8539e70806dd9cdc43e389f986ae1bdb684abd0460ec243333b5930b7ffe2cb0
+
+[Intervals]
+# Monitoring data collection interval in seconds
+monitoring = 60
+# Heartbeat sending interval in seconds
+heartbeat = 30
+
+[Logging]
+# Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+level = INFO
+# Log file path
+file = ./logs/agent.log

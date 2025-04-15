@@ -2,35 +2,61 @@
 @import '../../styles/mixins.scss';
 
 .vm-list {
+  width: 100%;
+  height: 100%;
+  
   &__header {
-    @include flex-between;
-    margin-bottom: $spacing-md;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
     
     @include max-sm {
       flex-direction: column;
       align-items: flex-start;
-      gap: $spacing-sm;
+      gap: $spacing-md;
     }
   }
   
   &__title {
-    margin: 0;
-    font-size: $font-size-heading-3;
+    margin-bottom: 0;
+    font-size: $font-size-heading-2;
+    
+    @include max-sm {
+      font-size: $font-size-heading-3;
+    }
   }
   
   &__actions {
     display: flex;
-    gap: $spacing-sm;
+    gap: $spacing-md;
+    
+    @include max-sm {
+      width: 100%;
+      justify-content: flex-end;
+    }
   }
   
   &__content {
-    margin-bottom: $spacing-lg;
+    position: relative;
+    width: 100%;
+    min-height: 400px;
   }
   
   &__loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 300px;
+    background-color: rgba(255, 255, 255, 0.7);
+    z-index: 10;
+  }
+  
+  .empty-state, .error-state {
+    min-height: 400px;
   }
 }

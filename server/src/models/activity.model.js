@@ -1,26 +1,22 @@
 // src/models/activity.model.js
 const mongoose = require('mongoose');
 
-const activitySchema = new mongoose.Schema(
+const activitySchema = mongoose.Schema(
   {
     action: {
       type: String,
       required: true,
-      enum: ['vm:start', 'vm:stop', 'vm:reboot', 'vm:sync', 'provider:add', 'provider:update', 'provider:delete', 'user:login', 'user:logout'],
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
     },
     resourceType: {
       type: String,
       required: true,
-      enum: ['vm', 'provider', 'user'],
     },
     resourceId: {
       type: mongoose.Schema.Types.ObjectId,
-      refPath: 'resourceType',
       required: true,
     },
     details: {
@@ -35,15 +31,28 @@ const activitySchema = new mongoose.Schema(
     errorMessage: {
       type: String,
     },
+    timestamp: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Index for fast lookups by user or resource
-activitySchema.index({ user: 1, createdAt: -1 });
-activitySchema.index({ resourceType: 1, resourceId: 1, createdAt: -1 });
+// Add indexes for performance
+activitySchema.index({ action: 1, timestamp: -1 });
+activitySchema.index({ user: 1, timestamp: -1 });
+activitySchema.index({ resourceType: 1, resourceId: 1, timestamp: -1 });
+activitySchema.index({ timestamp: -1 });
+
+// Convert to JSON method
+activitySchema.methods.toJSON = function() {
+  const activity = this.toObject();
+  delete activity.__v;
+  return activity;
+};
 
 const Activity = mongoose.model('Activity', activitySchema);
 

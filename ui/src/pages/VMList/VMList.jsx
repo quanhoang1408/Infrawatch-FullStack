@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import vmService from '../../services/vm.service';
 import { VMTable } from '../../components/vm';
@@ -15,19 +15,17 @@ const VMList = () => {
   const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
   
-  // Fetch VMs on component mount
-  useEffect(() => {
-    fetchVMs();
-  }, []);
-  
-  // Function to fetch VMs
-  const fetchVMs = async () => {
+  // Fetch VMs function
+  const fetchVMs = useCallback(async (shouldSync = false) => {
     try {
-      setLoading(true);
       setError(null);
-      const data = await vmService.getVMs();
+      if (!refreshing) setLoading(true);
       
-      // Log data structure to help debug
+      const data = await vmService.getVMs({
+        sync: shouldSync,
+      });
+      
+      // Log data structure in development
       if (process.env.NODE_ENV === 'development') {
         console.log('VM data structure:', data.length > 0 ? data[0] : 'No VMs found');
       }
@@ -35,23 +33,34 @@ const VMList = () => {
       setVms(data);
     } catch (err) {
       console.error('Error fetching VMs:', err);
-      setError(err);
+      setError(err.response?.data?.message || err.message || 'Failed to fetch VMs');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [refreshing]);
   
-  // Function to refresh VM list
+  // Initial fetch on component mount
+  useEffect(() => {
+    fetchVMs();
+    
+    // Set up auto-refresh every 30 seconds to update agent status
+    const refreshInterval = setInterval(() => {
+      fetchVMs();
+    }, 30000);
+    
+    return () => clearInterval(refreshInterval);
+  }, [fetchVMs]);
+  
+  // Function to refresh VM list with sync option
   const refreshVMs = async () => {
     try {
       setRefreshing(true);
-      const data = await vmService.getVMs();
-      setVms(data);
+      await fetchVMs(true); // Pass true to force sync with providers
       toast.success('VM list refreshed successfully');
     } catch (err) {
       console.error('Error refreshing VMs:', err);
       toast.error('Failed to refresh VM list');
-    } finally {
       setRefreshing(false);
     }
   };
@@ -85,7 +94,7 @@ const VMList = () => {
   
   // Render content based on state
   const renderContent = () => {
-    if (loading) {
+    if (loading && !refreshing) {
       return (
         <div className="vm-list__loading">
           <Spinner size="large" />
@@ -118,7 +127,15 @@ const VMList = () => {
       );
     }
     
-    return <VMTable vms={vms} onVMAction={handleVMAction} />;
+    return (
+      <VMTable 
+        vms={vms} 
+        onVMAction={handleVMAction}
+        loading={refreshing}
+        error={null}
+        onRefresh={refreshVMs}
+      />
+    );
   };
   
   return (

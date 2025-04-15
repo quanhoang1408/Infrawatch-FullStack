@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import VMStatusBadge from './VMStatusBadge';
+import AgentStatusBadge from './AgentStatusBadge';
 import ProviderIcon from './ProviderIcon';
 import VMActions from './VMActions';
 import './VMTable.scss';
@@ -25,6 +26,7 @@ const VMTable = ({ vms, onVMAction }) => {
             <th>Status</th>
             <th>Provider</th>
             <th>IP Address</th>
+            <th>Agent</th>
             <th>Last Sync</th>
             <th>Actions</th>
           </tr>
@@ -64,6 +66,9 @@ const VMTable = ({ vms, onVMAction }) => {
                   ) : (
                     <div>{vm.ipAddress || '-'}</div>
                   )}
+                </td>
+                <td className="vm-table__cell">
+                  <AgentStatusBadge connected={vm.agentConnected} />
                 </td>
                 <td className="vm-table__cell">
                   {vm.lastSyncAt ? (

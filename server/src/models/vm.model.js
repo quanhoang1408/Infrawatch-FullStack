@@ -45,6 +45,9 @@ const vmSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    lastSeenAt: {
+      type: Date,
+    },
     lastSyncAt: {
       type: Date,
       default: Date.now,

@@ -3,10 +3,14 @@ import api from './api';
 const vmService = {
   /**
    * Get all virtual machines from all configured providers
+   * @param {Object} options - Optional query parameters
+   * @param {boolean} options.sync - Whether to sync VMs before returning
    * @returns {Promise} - Promise with array of VM data
    */
-  getVMs: async () => {
-    const response = await api.get('/vm');
+  getVMs: async (options = {}) => {
+    const { sync } = options;
+    const queryParams = sync ? '?sync=true' : '';
+    const response = await api.get(`/vm${queryParams}`);
     return response.data;
   },
 
@@ -47,6 +51,16 @@ const vmService = {
    */
   rebootVM: async (id) => {
     const response = await api.post(`/vm/${id}/reboot`);
+    return response.data;
+  },
+
+  /**
+   * Check monitoring data for a VM
+   * @param {string} id - VM ID
+   * @returns {Promise} - Promise with monitoring data
+   */
+  getVMMonitoring: async (id) => {
+    const response = await api.get(`/monitoring/${id}/data`);
     return response.data;
   }
 };
