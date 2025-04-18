@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { vmService } from '../services';
-import { useNotification } from './useNotification';
+import useNotification from './useNotification';
 import { useVM } from './useVM';
 
 /**
  * Hook để thực hiện các hành động lên máy ảo
- * 
+ *
  * @returns {Object} Các phương thức thực hiện hành động và trạng thái
  */
 export const useVMActions = () => {
@@ -16,28 +16,28 @@ export const useVMActions = () => {
 
   /**
    * Khởi động máy ảo
-   * 
+   *
    * @param {string} vmId - ID của máy ảo cần khởi động
    * @returns {Promise<Object>} Kết quả thực hiện
    */
   const startVM = async (vmId) => {
     setLoading(true);
     setActionInProgress('start');
-    
+
     try {
       const vm = vms.find(vm => vm.id === vmId);
       const vmName = vm?.name || vmId;
-      
+
       const result = await vmService.startVM(vmId);
       showSuccess(
         'Khởi động máy ảo',
         `Máy ảo ${vmName} đã bắt đầu khởi động`
       );
-      
+
       // Tải lại thông tin máy ảo để cập nhật trạng thái
       await fetchVMById(vmId);
       await fetchVMs();
-      
+
       return result;
     } catch (err) {
       const errorMessage = err.response?.data?.message || `Không thể khởi động máy ảo ID: ${vmId}`;
@@ -51,7 +51,7 @@ export const useVMActions = () => {
 
   /**
    * Dừng máy ảo
-   * 
+   *
    * @param {string} vmId - ID của máy ảo cần dừng
    * @param {boolean} force - Có dừng cưỡng chế không
    * @returns {Promise<Object>} Kết quả thực hiện
@@ -59,21 +59,21 @@ export const useVMActions = () => {
   const stopVM = async (vmId, force = false) => {
     setLoading(true);
     setActionInProgress('stop');
-    
+
     try {
       const vm = vms.find(vm => vm.id === vmId);
       const vmName = vm?.name || vmId;
-      
+
       const result = await vmService.stopVM(vmId, force);
       showSuccess(
         'Dừng máy ảo',
         `Máy ảo ${vmName} đang dừng lại${force ? ' (cưỡng chế)' : ''}`
       );
-      
+
       // Tải lại thông tin máy ảo để cập nhật trạng thái
       await fetchVMById(vmId);
       await fetchVMs();
-      
+
       return result;
     } catch (err) {
       const errorMessage = err.response?.data?.message || `Không thể dừng máy ảo ID: ${vmId}`;
@@ -87,28 +87,28 @@ export const useVMActions = () => {
 
   /**
    * Khởi động lại máy ảo
-   * 
+   *
    * @param {string} vmId - ID của máy ảo cần khởi động lại
    * @returns {Promise<Object>} Kết quả thực hiện
    */
   const restartVM = async (vmId) => {
     setLoading(true);
     setActionInProgress('restart');
-    
+
     try {
       const vm = vms.find(vm => vm.id === vmId);
       const vmName = vm?.name || vmId;
-      
+
       const result = await vmService.restartVM(vmId);
       showSuccess(
         'Khởi động lại máy ảo',
         `Máy ảo ${vmName} đang khởi động lại`
       );
-      
+
       // Tải lại thông tin máy ảo để cập nhật trạng thái
       await fetchVMById(vmId);
       await fetchVMs();
-      
+
       return result;
     } catch (err) {
       const errorMessage = err.response?.data?.message || `Không thể khởi động lại máy ảo ID: ${vmId}`;
@@ -122,14 +122,14 @@ export const useVMActions = () => {
 
   /**
    * Xóa máy ảo
-   * 
+   *
    * @param {string} vmId - ID của máy ảo cần xóa
    * @returns {Promise<Object>} Kết quả thực hiện
    */
   const deleteVM = async (vmId) => {
     const vm = vms.find(vm => vm.id === vmId);
     const vmName = vm?.name || vmId;
-    
+
     // Hiển thị xác nhận trước khi xóa
     return new Promise((resolve, reject) => {
       showConfirmation({
@@ -138,17 +138,17 @@ export const useVMActions = () => {
         onConfirm: async () => {
           setLoading(true);
           setActionInProgress('delete');
-          
+
           try {
             const result = await vmService.deleteVM(vmId);
             showSuccess(
               'Xóa máy ảo',
               `Máy ảo ${vmName} đã được xóa thành công`
             );
-            
+
             // Tải lại danh sách máy ảo
             await fetchVMs();
-            
+
             resolve(result);
           } catch (err) {
             const errorMessage = err.response?.data?.message || `Không thể xóa máy ảo ID: ${vmId}`;
@@ -168,24 +168,24 @@ export const useVMActions = () => {
 
   /**
    * Tạo máy ảo mới
-   * 
+   *
    * @param {Object} vmData - Thông tin máy ảo mới
    * @returns {Promise<Object>} Thông tin máy ảo sau khi tạo
    */
   const createVM = async (vmData) => {
     setLoading(true);
     setActionInProgress('create');
-    
+
     try {
       const newVM = await vmService.createVM(vmData);
       showSuccess(
         'Tạo máy ảo',
         `Máy ảo ${newVM.name} đã được tạo thành công`
       );
-      
+
       // Tải lại danh sách máy ảo
       await fetchVMs();
-      
+
       return newVM;
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Không thể tạo máy ảo mới';
@@ -199,7 +199,7 @@ export const useVMActions = () => {
 
   /**
    * Thay đổi kích thước máy ảo
-   * 
+   *
    * @param {string} vmId - ID của máy ảo
    * @param {Object} specs - Thông số mới (CPU, RAM, disk)
    * @returns {Promise<Object>} Kết quả thực hiện
@@ -207,21 +207,21 @@ export const useVMActions = () => {
   const resizeVM = async (vmId, specs) => {
     setLoading(true);
     setActionInProgress('resize');
-    
+
     try {
       const vm = vms.find(vm => vm.id === vmId);
       const vmName = vm?.name || vmId;
-      
+
       const result = await vmService.resizeVM(vmId, specs);
       showSuccess(
         'Thay đổi kích thước máy ảo',
         `Máy ảo ${vmName} đã được điều chỉnh kích thước thành công`
       );
-      
+
       // Tải lại thông tin máy ảo để cập nhật
       await fetchVMById(vmId);
       await fetchVMs();
-      
+
       return result;
     } catch (err) {
       const errorMessage = err.response?.data?.message || `Không thể thay đổi kích thước máy ảo ID: ${vmId}`;
@@ -235,7 +235,7 @@ export const useVMActions = () => {
 
   /**
    * Tạo snapshot của máy ảo
-   * 
+   *
    * @param {string} vmId - ID của máy ảo
    * @param {string} name - Tên của snapshot
    * @param {string} description - Mô tả snapshot
@@ -244,17 +244,17 @@ export const useVMActions = () => {
   const createVMSnapshot = async (vmId, name, description = '') => {
     setLoading(true);
     setActionInProgress('snapshot');
-    
+
     try {
       const vm = vms.find(vm => vm.id === vmId);
       const vmName = vm?.name || vmId;
-      
+
       const snapshot = await vmService.createSnapshot(vmId, { name, description });
       showSuccess(
         'Tạo snapshot',
         `Snapshot "${name}" cho máy ảo ${vmName} đã được tạo thành công`
       );
-      
+
       return snapshot;
     } catch (err) {
       const errorMessage = err.response?.data?.message || `Không thể tạo snapshot cho máy ảo ID: ${vmId}`;
@@ -268,7 +268,7 @@ export const useVMActions = () => {
 
   /**
    * Khôi phục máy ảo từ snapshot
-   * 
+   *
    * @param {string} vmId - ID của máy ảo
    * @param {string} snapshotId - ID của snapshot
    * @returns {Promise<Object>} Kết quả thực hiện
@@ -276,20 +276,20 @@ export const useVMActions = () => {
   const restoreVMSnapshot = async (vmId, snapshotId) => {
     setLoading(true);
     setActionInProgress('restore');
-    
+
     try {
       const vm = vms.find(vm => vm.id === vmId);
       const vmName = vm?.name || vmId;
-      
+
       const result = await vmService.restoreSnapshot(vmId, snapshotId);
       showSuccess(
         'Khôi phục snapshot',
         `Máy ảo ${vmName} đã được khôi phục từ snapshot thành công`
       );
-      
+
       // Tải lại thông tin máy ảo để cập nhật
       await fetchVMById(vmId);
-      
+
       return result;
     } catch (err) {
       const errorMessage = err.response?.data?.message || `Không thể khôi phục snapshot cho máy ảo ID: ${vmId}`;
@@ -303,24 +303,24 @@ export const useVMActions = () => {
 
   /**
    * Cập nhật SSH certificate cho máy ảo
-   * 
+   *
    * @param {string} vmId - ID của máy ảo
    * @returns {Promise<Object>} Kết quả thực hiện
    */
   const updateSSHCertificate = async (vmId) => {
     setLoading(true);
     setActionInProgress('updateSSH');
-    
+
     try {
       const vm = vms.find(vm => vm.id === vmId);
       const vmName = vm?.name || vmId;
-      
+
       const result = await vmService.updateSSHCertificate(vmId);
       showSuccess(
         'Cập nhật SSH certificate',
         `SSH certificate của máy ảo ${vmName} đã được cập nhật thành công`
       );
-      
+
       return result;
     } catch (err) {
       const errorMessage = err.response?.data?.message || `Không thể cập nhật SSH certificate cho máy ảo ID: ${vmId}`;

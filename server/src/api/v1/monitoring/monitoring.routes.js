@@ -15,6 +15,11 @@ router
     validate(monitoringValidation.sendMonitoringData),
     agentAuth,
     monitoringController.sendMonitoringData
+  )
+  .get(
+    validate(monitoringValidation.queryMonitoring),
+    auth(),
+    monitoringController.queryMonitoringData
   );
 
 // Routes for user/admin to get monitoring data

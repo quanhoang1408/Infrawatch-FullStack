@@ -42,6 +42,17 @@ const getMonitoring = {
   }),
 };
 
+const queryMonitoring = {
+  params: Joi.object().keys({
+    vmId: Joi.string().required().custom(objectId),
+  }),
+  query: Joi.object().keys({
+    startTime: Joi.date().iso(),
+    endTime: Joi.date().iso().min(Joi.ref('startTime')),
+    granularity: Joi.string().valid('raw', '1m', '5m', '15m', '1h', '1d').default('raw'),
+  }),
+};
+
 const heartbeat = {
   params: Joi.object().keys({
     vmId: Joi.string().required().custom(objectId),
@@ -51,5 +62,6 @@ const heartbeat = {
 module.exports = {
   sendMonitoringData,
   getMonitoring,
+  queryMonitoring,
   heartbeat,
 };

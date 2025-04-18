@@ -22,6 +22,36 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
           console.error('Failed to fetch user data:', err);
           clearTokens();
+
+          // For development: Auto-login with test credentials
+          if (process.env.NODE_ENV === 'development') {
+            try {
+              console.log('Attempting auto-login with test credentials...');
+              const result = await authService.login({
+                email: 'test@example.com',
+                password: 'password123'
+              });
+              setUser(result.user);
+              console.log('Auto-login successful');
+            } catch (loginErr) {
+              console.error('Auto-login failed:', loginErr);
+            }
+          }
+        }
+      } else {
+        // For development: Auto-login with test credentials if not authenticated
+        if (process.env.NODE_ENV === 'development') {
+          try {
+            console.log('Attempting auto-login with test credentials...');
+            const result = await authService.login({
+              email: 'test@example.com',
+              password: 'password123'
+            });
+            setUser(result.user);
+            console.log('Auto-login successful');
+          } catch (loginErr) {
+            console.error('Auto-login failed:', loginErr);
+          }
         }
       }
       setLoading(false);

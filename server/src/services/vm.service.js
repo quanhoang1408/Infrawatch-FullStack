@@ -5,6 +5,7 @@ const { createProviderService } = require('./provider/provider.factory');
 const providerService = require('./provider.service');
 const activityService = require('./activity.service');
 const { ApiError } = require('../utils/errors');
+const sseService = require('./sse.service');
 
 /**
  * Sync VMs from all providers or specific provider

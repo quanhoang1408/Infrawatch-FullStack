@@ -1,7 +1,7 @@
-// Card.jsx
+// Card.jsx - Simplified version for development
 import React from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Card.scss';
+// import '../styles/components/Card.scss';
 
 /**
  * Card component for Infrawatch
@@ -35,21 +35,48 @@ const Card = ({
   ].filter(Boolean).join(' ');
 
   return (
-    <div className={classes} {...rest}>
+    <div
+      className={classes}
+      style={{
+        border: bordered ? '1px solid #ddd' : 'none',
+        borderRadius: '4px',
+        padding: '16px',
+        marginBottom: '16px',
+        backgroundColor: '#fff',
+        boxShadow: hoverable ? '0 4px 8px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.1)',
+        transition: 'box-shadow 0.3s ease',
+        position: 'relative'
+      }}
+      {...rest}
+    >
       {(title || actions) && (
-        <div className={`${baseClass}__header`}>
-          {title && <div className={`${baseClass}__title`}>{title}</div>}
-          {actions && <div className={`${baseClass}__actions`}>{actions}</div>}
+        <div
+          style={{
+            marginBottom: '16px',
+            paddingBottom: '8px',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          {title && <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{title}</div>}
+          {actions && <div>{actions}</div>}
         </div>
       )}
-      <div className={`${baseClass}__content`}>
+      <div style={{ position: 'relative' }}>
         {loading ? (
-          <div className={`${baseClass}__loading-indicator`}>
-            <div className={`${baseClass}__loading-spinner`}></div>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '20px'
+          }}>
+            Loading...
           </div>
         ) : children}
       </div>
-      {footer && <div className={`${baseClass}__footer`}>{footer}</div>}
+      {footer && <div style={{ marginTop: '16px', paddingTop: '8px', borderTop: '1px solid #eee' }}>{footer}</div>}
     </div>
   );
 };

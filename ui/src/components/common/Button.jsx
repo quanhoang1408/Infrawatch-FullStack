@@ -1,7 +1,7 @@
-// Button.jsx
+// Button.jsx - Simplified version for development
 import React from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Button.scss';
+// import '../styles/components/Button.scss';
 
 /**
  * Button component for Infrawatch
@@ -15,7 +15,7 @@ import '../styles/components/Button.scss';
  * @param {node} children - Button content
  * @param {string} className - Additional class names
  */
-const Button = ({ 
+const Button = ({
   variant = 'primary',
   size = 'md',
   fullWidth = false,
@@ -41,18 +41,115 @@ const Button = ({
     className
   ].filter(Boolean).join(' ');
 
+  // Style mapping
+  const variantStyles = {
+    primary: {
+      backgroundColor: '#2196F3',
+      color: 'white',
+      border: 'none'
+    },
+    secondary: {
+      backgroundColor: '#757575',
+      color: 'white',
+      border: 'none'
+    },
+    danger: {
+      backgroundColor: '#F44336',
+      color: 'white',
+      border: 'none'
+    },
+    success: {
+      backgroundColor: '#4CAF50',
+      color: 'white',
+      border: 'none'
+    },
+    warning: {
+      backgroundColor: '#FF9800',
+      color: 'white',
+      border: 'none'
+    },
+    text: {
+      backgroundColor: 'transparent',
+      color: '#2196F3',
+      border: 'none'
+    },
+    outline: {
+      backgroundColor: 'transparent',
+      color: '#2196F3',
+      border: '1px solid #2196F3'
+    }
+  };
+
+  const sizeStyles = {
+    sm: {
+      padding: '0.25rem 0.5rem',
+      fontSize: '0.875rem'
+    },
+    md: {
+      padding: '0.5rem 1rem',
+      fontSize: '1rem'
+    },
+    lg: {
+      padding: '0.75rem 1.5rem',
+      fontSize: '1.25rem'
+    }
+  };
+
+  const baseStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 500,
+    textAlign: 'center',
+    verticalAlign: 'middle',
+    cursor: disabled || loading ? 'not-allowed' : 'pointer',
+    userSelect: 'none',
+    borderRadius: '0.25rem',
+    transition: 'all 0.2s ease-in-out',
+    opacity: disabled || loading ? 0.65 : 1,
+    width: fullWidth ? '100%' : 'auto',
+    ...variantStyles[variant],
+    ...sizeStyles[size]
+  };
+
+  const spinnerStyle = {
+    display: 'inline-block',
+    width: '1rem',
+    height: '1rem',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+    borderRadius: '50%',
+    borderTopColor: 'white',
+    animation: 'spin 1s linear infinite',
+    marginRight: children ? '0.5rem' : 0
+  };
+
+  const iconStyle = {
+    marginRight: iconPosition === 'left' && children ? '0.5rem' : 0,
+    marginLeft: iconPosition === 'right' && children ? '0.5rem' : 0,
+    display: 'inline-flex',
+    alignItems: 'center'
+  };
+
   return (
     <button
       type={type}
       className={classes}
+      style={baseStyle}
       onClick={onClick}
       disabled={disabled || loading}
       {...rest}
     >
-      {loading && <span className={`${baseClass}__spinner`}></span>}
-      {icon && iconPosition === 'left' && <span className={`${baseClass}__icon ${baseClass}__icon--left`}>{icon}</span>}
-      {children && <span className={`${baseClass}__text`}>{children}</span>}
-      {icon && iconPosition === 'right' && <span className={`${baseClass}__icon ${baseClass}__icon--right`}>{icon}</span>}
+      {loading && <span style={spinnerStyle}></span>}
+      {icon && iconPosition === 'left' && <span style={{...iconStyle, order: 1}}>{icon}</span>}
+      {children && <span style={{order: 2}}>{children}</span>}
+      {icon && iconPosition === 'right' && <span style={{...iconStyle, order: 3}}>{icon}</span>}
+
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </button>
   );
 };

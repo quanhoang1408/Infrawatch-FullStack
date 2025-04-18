@@ -21,11 +21,11 @@ const VMList = () => {
       setError(null);
       if (!refreshing) setLoading(true);
       
+      // Đã đúng, giữ nguyên getVMs
       const data = await vmService.getVMs({
         sync: shouldSync,
       });
       
-      // Log data structure in development
       if (process.env.NODE_ENV === 'development') {
         console.log('VM data structure:', data.length > 0 ? data[0] : 'No VMs found');
       }

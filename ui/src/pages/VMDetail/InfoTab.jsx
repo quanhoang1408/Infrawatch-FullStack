@@ -1,35 +1,44 @@
 import React from 'react';
-import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { VMStatusBadge } from '../../components/vm/VMStatusBadge';
-import { VMCardInfo } from '../../components/vm/VMCardInfo';
-import { ProviderIcon } from '../../components/vm/ProviderIcon';
+import Card from '../../components/common/Card';
+import Button from '../../components/common/Button';
+import StatusBadge from '../../components/common/StatusBadge';
 import { formatBytes, formatDate } from '../../utils/format.utils';
+
+// Temporary placeholders for VM components
+const VMStatusBadge = ({ status }) => (
+  <StatusBadge
+    status={status === 'running' ? 'success' : status === 'stopped' ? 'default' : 'warning'}
+    text={status}
+  />
+);
+
+const ProviderIcon = ({ provider, size }) => (
+  <span style={{ marginRight: '8px' }}>🖥️</span>
+);
 
 const InfoTab = ({ vm, onAction }) => {
   const isRunning = vm.status === 'running';
-  
+
   // Helper function to format uptime
   const formatUptime = (seconds) => {
     if (!seconds || seconds <= 0) return 'Not available';
-    
+
     const days = Math.floor(seconds / (3600 * 24));
     const hours = Math.floor((seconds % (3600 * 24)) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     const parts = [];
     if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
     if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
     if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
-    
+
     return parts.join(', ');
   };
-  
+
   return (
     <div className="info-tab">
       <div className="actions-container">
-        <Button 
+        <Button
           disabled={isRunning}
           onClick={() => onAction('start')}
           variant="primary"
@@ -37,7 +46,7 @@ const InfoTab = ({ vm, onAction }) => {
         >
           Start
         </Button>
-        <Button 
+        <Button
           disabled={!isRunning}
           onClick={() => onAction('stop')}
           variant="danger"
@@ -45,7 +54,7 @@ const InfoTab = ({ vm, onAction }) => {
         >
           Stop
         </Button>
-        <Button 
+        <Button
           disabled={!isRunning}
           onClick={() => onAction('restart')}
           variant="warning"
@@ -53,7 +62,7 @@ const InfoTab = ({ vm, onAction }) => {
         >
           Restart
         </Button>
-        <Button 
+        <Button
           disabled={!isRunning}
           icon="terminal"
           variant="secondary"
@@ -62,7 +71,7 @@ const InfoTab = ({ vm, onAction }) => {
           SSH Terminal
         </Button>
       </div>
-      
+
       <div className="info-grid">
         <Card title="General Information">
           <div className="info-row">
@@ -129,9 +138,9 @@ const InfoTab = ({ vm, onAction }) => {
             <div className="info-value">
               {vm.publicIp || 'N/A'}
               {vm.publicIp && (
-                <Button 
-                  size="small" 
-                  variant="text" 
+                <Button
+                  size="small"
+                  variant="text"
                   icon="copy"
                   onClick={() => navigator.clipboard.writeText(vm.publicIp)}
                   title="Copy to clipboard"
@@ -144,9 +153,9 @@ const InfoTab = ({ vm, onAction }) => {
             <div className="info-value">
               {vm.privateIp || 'N/A'}
               {vm.privateIp && (
-                <Button 
-                  size="small" 
-                  variant="text" 
+                <Button
+                  size="small"
+                  variant="text"
                   icon="copy"
                   onClick={() => navigator.clipboard.writeText(vm.privateIp)}
                   title="Copy to clipboard"

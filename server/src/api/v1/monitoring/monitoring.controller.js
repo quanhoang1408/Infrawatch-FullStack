@@ -2,6 +2,7 @@
 const { asyncHandler } = require('../../../utils/asyncHandler');
 const monitoringService = require('../../../services/monitoring.service');
 const agentService = require('../../../services/agent.service');
+const sseService = require('../../../services/sse.service');
 
 /**
  * Receive and save monitoring data from agent
@@ -67,8 +68,33 @@ const heartbeat = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Query monitoring data with time range and granularity
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const queryMonitoringData = asyncHandler(async (req, res) => {
+  const { vmId } = req.params;
+  const { startTime, endTime, granularity } = req.query;
+  
+  // Convert string dates to Date objects
+  const start = startTime ? new Date(startTime) : new Date(Date.now() - 24 * 60 * 60 * 1000); // Default to last 24 hours
+  const end = endTime ? new Date(endTime) : new Date();
+  
+  // Query data with appropriate granularity
+  const data = await monitoringService.queryMonitoringData(
+    vmId,
+    start,
+    end,
+    granularity || 'raw'
+  );
+  
+  res.send(data);
+});
+
 module.exports = {
   sendMonitoringData,
   getMonitoringData,
   heartbeat,
+  queryMonitoringData
 };

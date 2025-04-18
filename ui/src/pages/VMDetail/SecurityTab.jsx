@@ -1,22 +1,88 @@
 import React, { useState, useEffect } from 'react';
-import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
-import { Spinner } from '../../components/common/Spinner';
-import { ErrorState } from '../../components/common/ErrorState';
-import { Table } from '../../components/common/Table';
-import { Modal } from '../../components/common/Modal';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { CertificateCard } from '../../components/certificates/CertificateCard';
+import Card from '../../components/common/Card';
+import Button from '../../components/common/Button';
+import Spinner from '../../components/common/Spinner';
+import ErrorState from '../../components/common/ErrorState';
+import Table from '../../components/common/Table';
+import StatusBadge from '../../components/common/StatusBadge';
 import { useVM } from '../../hooks/useVM';
 import { useCertificate } from '../../hooks/useCertificate';
-import { useNotification } from '../../hooks/useNotification';
+import useNotification from '../../hooks/useNotification';
 import { formatDate } from '../../utils/format.utils';
+
+// Temporary Modal component
+const Modal = ({ title, onClose, size = 'medium', children }) => (
+  <div style={{
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000
+  }}>
+    <div style={{
+      backgroundColor: 'white',
+      borderRadius: '4px',
+      padding: '20px',
+      width: size === 'small' ? '400px' : size === 'large' ? '800px' : '600px',
+      maxWidth: '90%',
+      maxHeight: '90vh',
+      overflow: 'auto'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h2 style={{ margin: 0 }}>{title}</h2>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>&times;</button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+// Temporary CertificateCard component
+const CertificateCard = ({ certificate, onRevoke }) => (
+  <div style={{
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    padding: '16px',
+    marginBottom: '16px',
+    backgroundColor: certificate.status === 'active' ? '#f1f8e9' : '#f5f5f5'
+  }}>
+    <h3 style={{ margin: '0 0 8px 0' }}>{certificate.name}</h3>
+    <div style={{ marginBottom: '8px' }}>
+      <StatusBadge
+        status={certificate.status === 'active' ? 'success' : 'default'}
+        text={certificate.status}
+      />
+    </div>
+    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
+      <strong>Issued:</strong> {formatDate(certificate.issuedAt)}
+    </div>
+    <div style={{ fontSize: '0.875rem', marginBottom: '4px' }}>
+      <strong>Expires:</strong> {formatDate(certificate.expiresAt)}
+    </div>
+    {certificate.status === 'active' && (
+      <div style={{ marginTop: '12px' }}>
+        <Button
+          variant="danger"
+          size="small"
+          onClick={onRevoke}
+        >
+          Revoke
+        </Button>
+      </div>
+    )}
+  </div>
+);
 
 const SecurityTab = ({ vm }) => {
   const { getVMSecurityDetails, updateVMSecurity, loading, error } = useVM();
   const { generateCertificate, revokeCertificate } = useCertificate();
   const { showNotification } = useNotification();
-  
+
   const [securityDetails, setSecurityDetails] = useState(null);
   const [sshKeys, setSSHKeys] = useState([]);
   const [certificates, setCertificates] = useState([]);
@@ -27,7 +93,7 @@ const SecurityTab = ({ vm }) => {
   const [newKeyValue, setNewKeyValue] = useState('');
   const [newCertName, setNewCertName] = useState('');
   const [newCertValidity, setNewCertValidity] = useState(30); // Days
-  
+
   useEffect(() => {
     const fetchSecurityDetails = async () => {
       try {
@@ -40,10 +106,10 @@ const SecurityTab = ({ vm }) => {
         console.error('Error fetching security details:', err);
       }
     };
-    
+
     fetchSecurityDetails();
   }, [vm.id, getVMSecurityDetails]);
-  
+
   const handleAddSSHKey = async () => {
     if (!newKeyName || !newKeyValue) {
       showNotification({
@@ -52,23 +118,23 @@ const SecurityTab = ({ vm }) => {
       });
       return;
     }
-    
+
     try {
       const result = await updateVMSecurity(vm.id, {
         action: 'addSSHKey',
         keyName: newKeyName,
         keyValue: newKeyValue
       });
-      
+
       if (result.success) {
         // Update the local state
         setSSHKeys(prevKeys => [...prevKeys, result.key]);
-        
+
         showNotification({
           type: 'success',
           message: 'SSH key added successfully'
         });
-        
+
         setShowAddKeyModal(false);
         setNewKeyName('');
         setNewKeyValue('');
@@ -81,18 +147,18 @@ const SecurityTab = ({ vm }) => {
       });
     }
   };
-  
+
   const handleDeleteSSHKey = async (keyId) => {
     try {
       const result = await updateVMSecurity(vm.id, {
         action: 'removeSSHKey',
         keyId: keyId
       });
-      
+
       if (result.success) {
         // Update the local state
         setSSHKeys(prevKeys => prevKeys.filter(key => key.id !== keyId));
-        
+
         showNotification({
           type: 'success',
           message: 'SSH key removed successfully'
@@ -106,7 +172,7 @@ const SecurityTab = ({ vm }) => {
       });
     }
   };
-  
+
   const handleGenerateCertificate = async () => {
     if (!newCertName) {
       showNotification({
@@ -115,23 +181,23 @@ const SecurityTab = ({ vm }) => {
       });
       return;
     }
-    
+
     try {
       const result = await generateCertificate({
         vmId: vm.id,
         name: newCertName,
         validityDays: newCertValidity
       });
-      
+
       if (result.success) {
         // Update the local state
         setCertificates(prevCerts => [...prevCerts, result.certificate]);
-        
+
         showNotification({
           type: 'success',
           message: 'Certificate generated successfully'
         });
-        
+
         setShowGenerateCertModal(false);
         setNewCertName('');
       }
@@ -143,21 +209,21 @@ const SecurityTab = ({ vm }) => {
       });
     }
   };
-  
+
   const handleRevokeCertificate = async (certId) => {
     try {
       const result = await revokeCertificate(certId);
-      
+
       if (result.success) {
         // Update the local state
-        setCertificates(prevCerts => 
-          prevCerts.map(cert => 
-            cert.id === certId 
-              ? { ...cert, status: 'revoked', revokedAt: new Date().toISOString() } 
+        setCertificates(prevCerts =>
+          prevCerts.map(cert =>
+            cert.id === certId
+              ? { ...cert, status: 'revoked', revokedAt: new Date().toISOString() }
               : cert
           )
         );
-        
+
         showNotification({
           type: 'success',
           message: 'Certificate revoked successfully'
@@ -171,17 +237,17 @@ const SecurityTab = ({ vm }) => {
       });
     }
   };
-  
+
   const runSecurityScan = async () => {
     try {
       const result = await updateVMSecurity(vm.id, {
         action: 'runSecurityScan'
       });
-      
+
       if (result.success) {
         // Update the local state
         setSecurityScans(prevScans => [result.scan, ...prevScans]);
-        
+
         showNotification({
           type: 'success',
           message: 'Security scan initiated successfully'
@@ -195,7 +261,7 @@ const SecurityTab = ({ vm }) => {
       });
     }
   };
-  
+
   if (loading && !securityDetails) {
     return (
       <div className="security-loading">
@@ -204,32 +270,32 @@ const SecurityTab = ({ vm }) => {
       </div>
     );
   }
-  
+
   if (error) {
     return (
-      <ErrorState 
+      <ErrorState
         title="Failed to load security details"
         message={error.message}
       />
     );
   }
-  
+
   if (!securityDetails) {
     return (
-      <ErrorState 
+      <ErrorState
         title="No security details available"
         message="Unable to retrieve security information for this virtual machine."
       />
     );
   }
-  
+
   return (
     <div className="security-tab">
-      <Card 
-        title="SSH Keys" 
+      <Card
+        title="SSH Keys"
         actions={
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             size="small"
             icon="plus"
             onClick={() => setShowAddKeyModal(true)}
@@ -245,8 +311,8 @@ const SecurityTab = ({ vm }) => {
             { key: 'addedAt', header: 'Added Date', render: (row) => formatDate(row.addedAt) },
             { key: 'lastUsed', header: 'Last Used', render: (row) => row.lastUsed ? formatDate(row.lastUsed) : 'Never' },
             { key: 'actions', header: 'Actions', render: (row) => (
-              <Button 
-                variant="icon" 
+              <Button
+                variant="icon"
                 icon="trash"
                 onClick={() => handleDeleteSSHKey(row.id)}
                 title="Delete key"
@@ -257,12 +323,12 @@ const SecurityTab = ({ vm }) => {
           emptyMessage="No SSH keys configured"
         />
       </Card>
-      
-      <Card 
-        title="SSH Certificates" 
+
+      <Card
+        title="SSH Certificates"
         actions={
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             size="small"
             icon="plus"
             onClick={() => setShowGenerateCertModal(true)}
@@ -274,7 +340,7 @@ const SecurityTab = ({ vm }) => {
         {certificates.length > 0 ? (
           <div className="certificates-grid">
             {certificates.map(cert => (
-              <CertificateCard 
+              <CertificateCard
                 key={cert.id}
                 certificate={cert}
                 onRevoke={() => handleRevokeCertificate(cert.id)}
@@ -288,12 +354,12 @@ const SecurityTab = ({ vm }) => {
           </div>
         )}
       </Card>
-      
-      <Card 
-        title="Security Scans" 
+
+      <Card
+        title="Security Scans"
         actions={
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             size="small"
             icon="shield"
             onClick={runSecurityScan}
@@ -306,25 +372,25 @@ const SecurityTab = ({ vm }) => {
           columns={[
             { key: 'scanDate', header: 'Scan Date', render: (row) => formatDate(row.scanDate) },
             { key: 'status', header: 'Status', render: (row) => (
-              <StatusBadge 
+              <StatusBadge
                 status={
-                  row.status === 'completed' 
+                  row.status === 'completed'
                     ? (row.vulnerabilities > 0 ? 'danger' : 'success')
-                    : row.status === 'in-progress' 
-                      ? 'warning' 
+                    : row.status === 'in-progress'
+                      ? 'warning'
                       : 'error'
-                } 
+                }
                 text={row.status}
               />
             )},
             { key: 'vulnerabilities', header: 'Vulnerabilities', render: (row) => (
-              row.status === 'completed' 
+              row.status === 'completed'
                 ? `${row.criticalVulnerabilities} critical, ${row.vulnerabilities - row.criticalVulnerabilities} other`
                 : '-'
             )},
             { key: 'actions', header: 'Actions', render: (row) => (
-              <Button 
-                variant="text" 
+              <Button
+                variant="text"
                 disabled={row.status !== 'completed'}
                 onClick={() => {/* View scan details */}}
               >
@@ -336,17 +402,17 @@ const SecurityTab = ({ vm }) => {
           emptyMessage="No security scans have been run"
         />
       </Card>
-      
+
       <Card title="Security Settings">
         <div className="security-settings">
           <div className="setting-item">
             <div className="setting-label">Password Authentication</div>
             <div className="setting-value">
               <div className="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  id="password-auth" 
-                  checked={securityDetails.passwordAuth} 
+                <input
+                  type="checkbox"
+                  id="password-auth"
+                  checked={securityDetails.passwordAuth}
                   onChange={() => {
                     updateVMSecurity(vm.id, {
                       action: 'togglePasswordAuth',
@@ -366,15 +432,15 @@ const SecurityTab = ({ vm }) => {
               <span>{securityDetails.passwordAuth ? 'Enabled' : 'Disabled'}</span>
             </div>
           </div>
-          
+
           <div className="setting-item">
             <div className="setting-label">Root Login</div>
             <div className="setting-value">
               <div className="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  id="root-login" 
-                  checked={securityDetails.rootLogin} 
+                <input
+                  type="checkbox"
+                  id="root-login"
+                  checked={securityDetails.rootLogin}
                   onChange={() => {
                     updateVMSecurity(vm.id, {
                       action: 'toggleRootLogin',
@@ -394,15 +460,15 @@ const SecurityTab = ({ vm }) => {
               <span>{securityDetails.rootLogin ? 'Enabled' : 'Disabled'}</span>
             </div>
           </div>
-          
+
           <div className="setting-item">
             <div className="setting-label">Automatic Security Updates</div>
             <div className="setting-value">
               <div className="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  id="auto-updates" 
-                  checked={securityDetails.autoUpdates} 
+                <input
+                  type="checkbox"
+                  id="auto-updates"
+                  checked={securityDetails.autoUpdates}
                   onChange={() => {
                     updateVMSecurity(vm.id, {
                       action: 'toggleAutoUpdates',
@@ -424,7 +490,7 @@ const SecurityTab = ({ vm }) => {
           </div>
         </div>
       </Card>
-      
+
       {/* Add SSH Key Modal */}
       {showAddKeyModal && (
         <Modal
@@ -438,18 +504,18 @@ const SecurityTab = ({ vm }) => {
         >
           <div className="form-group">
             <label>Key Name</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder="e.g., my-laptop-key"
               className="form-control"
             />
           </div>
-          
+
           <div className="form-group">
             <label>Public Key</label>
-            <textarea 
+            <textarea
               value={newKeyValue}
               onChange={(e) => setNewKeyValue(e.target.value)}
               placeholder="Paste your SSH public key (starts with ssh-rsa or ssh-ed25519)"
@@ -457,10 +523,10 @@ const SecurityTab = ({ vm }) => {
               rows={5}
             />
           </div>
-          
+
           <div className="modal-actions">
-            <Button 
-              variant="secondary" 
+            <Button
+              variant="secondary"
               onClick={() => {
                 setShowAddKeyModal(false);
                 setNewKeyName('');
@@ -469,8 +535,8 @@ const SecurityTab = ({ vm }) => {
             >
               Cancel
             </Button>
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               onClick={handleAddSSHKey}
               disabled={!newKeyName || !newKeyValue}
             >
@@ -479,7 +545,7 @@ const SecurityTab = ({ vm }) => {
           </div>
         </Modal>
       )}
-      
+
       {/* Generate Certificate Modal */}
       {showGenerateCertModal && (
         <Modal
@@ -492,19 +558,19 @@ const SecurityTab = ({ vm }) => {
         >
           <div className="form-group">
             <label>Certificate Name</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={newCertName}
               onChange={(e) => setNewCertName(e.target.value)}
               placeholder="e.g., dev-laptop-cert"
               className="form-control"
             />
           </div>
-          
+
           <div className="form-group">
             <label>Validity Period (Days)</label>
-            <input 
-              type="number" 
+            <input
+              type="number"
               value={newCertValidity}
               min="1"
               max="365"
@@ -512,10 +578,10 @@ const SecurityTab = ({ vm }) => {
               className="form-control"
             />
           </div>
-          
+
           <div className="modal-actions">
-            <Button 
-              variant="secondary" 
+            <Button
+              variant="secondary"
               onClick={() => {
                 setShowGenerateCertModal(false);
                 setNewCertName('');
@@ -523,8 +589,8 @@ const SecurityTab = ({ vm }) => {
             >
               Cancel
             </Button>
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               onClick={handleGenerateCertificate}
               disabled={!newCertName}
             >

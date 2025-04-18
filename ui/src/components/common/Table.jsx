@@ -1,7 +1,7 @@
-// Table.jsx
+// Table.jsx - Simplified version for development
 import React from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Table.scss';
+// import '../styles/components/Table.scss';
 
 /**
  * Table component for displaying data in rows and columns
@@ -41,16 +41,77 @@ const Table = ({
     }
   };
 
+  // Style definitions
+  const tableStyle = {
+    width: '100%',
+    borderCollapse: 'collapse',
+    border: bordered ? '1px solid #ddd' : 'none',
+    borderRadius: '4px',
+    overflow: 'hidden'
+  };
+
+  const thStyle = {
+    padding: size === 'small' ? '8px 12px' : size === 'large' ? '16px 24px' : '12px 16px',
+    textAlign: 'left',
+    backgroundColor: '#f5f5f5',
+    borderBottom: '2px solid #ddd',
+    fontWeight: 'bold',
+    color: '#333'
+  };
+
+  const tdStyle = {
+    padding: size === 'small' ? '8px 12px' : size === 'large' ? '16px 24px' : '12px 16px',
+    borderBottom: '1px solid #eee',
+    color: '#333'
+  };
+
+  const trStyle = hover ? {
+    cursor: onRowClick ? 'pointer' : 'default',
+    transition: 'background-color 0.2s'
+  } : {};
+
+  const loadingStyle = {
+    opacity: 0.5,
+    pointerEvents: 'none'
+  };
+
+  const loadingContainerStyle = {
+    padding: '32px 16px',
+    textAlign: 'center',
+    color: '#666',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
+  };
+
+  const loadingSpinnerStyle = {
+    display: 'inline-block',
+    width: '20px',
+    height: '20px',
+    border: '2px solid rgba(0, 0, 0, 0.1)',
+    borderRadius: '50%',
+    borderTopColor: '#2196F3',
+    animation: 'spin 1s linear infinite'
+  };
+
+  const emptyStyle = {
+    padding: '32px 16px',
+    textAlign: 'center',
+    color: '#666'
+  };
+
   return (
-    <div className={`${baseClass}-container`} {...rest}>
-      <table className={classes}>
-        <thead className={`${baseClass}__header`}>
+    <div className={`${baseClass}-container`} style={{ overflowX: 'auto' }} {...rest}>
+      <table className={classes} style={loading ? {...tableStyle, ...loadingStyle} : tableStyle}>
+        <thead>
           <tr>
             {columns.map((column, index) => (
               <th
                 key={column.key || column.dataIndex || index}
                 className={column.className}
-                style={{ 
+                style={{
+                  ...thStyle,
                   width: column.width,
                   textAlign: column.align || 'left'
                 }}
@@ -60,48 +121,64 @@ const Table = ({
             ))}
           </tr>
         </thead>
-        <tbody className={`${baseClass}__body`}>
+        <tbody>
           {loading ? (
-            <tr className={`${baseClass}__loading-row`}>
-              <td colSpan={columns.length}>
-                <div className={`${baseClass}__loading-indicator`}>
-                  <div className={`${baseClass}__loading-spinner`}></div>
-                  <span>Loading...</span>
-                </div>
+            <tr>
+              <td colSpan={columns.length} style={loadingContainerStyle}>
+                <div style={loadingSpinnerStyle}></div>
+                <span>Loading...</span>
               </td>
             </tr>
           ) : dataSource.length === 0 ? (
-            <tr className={`${baseClass}__empty-row`}>
-              <td colSpan={columns.length}>
-                <div className={`${baseClass}__empty-text`}>{emptyText}</div>
+            <tr>
+              <td colSpan={columns.length} style={emptyStyle}>
+                {emptyText}
               </td>
             </tr>
           ) : (
-            dataSource.map((record, rowIndex) => (
-              <tr
-                key={record[rowKey] || rowIndex}
-                className={`${baseClass}__row`}
-                onClick={() => handleRowClick(record, rowIndex)}
-              >
-                {columns.map((column, colIndex) => {
-                  const value = record[column.dataIndex];
-                  return (
-                    <td
-                      key={column.key || column.dataIndex || colIndex}
-                      className={column.cellClassName}
-                      style={{ textAlign: column.align || 'left' }}
-                    >
-                      {column.render
-                        ? column.render(value, record, rowIndex)
-                        : value}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))
+            dataSource.map((record, rowIndex) => {
+              const isEven = rowIndex % 2 === 0;
+              const rowStyle = {
+                ...trStyle,
+                backgroundColor: striped && isEven ? '#f9f9f9' : 'transparent'
+              };
+
+              return (
+                <tr
+                  key={record[rowKey] || rowIndex}
+                  style={rowStyle}
+                  onClick={() => handleRowClick(record, rowIndex)}
+                >
+                  {columns.map((column, colIndex) => {
+                    const value = record[column.dataIndex];
+                    return (
+                      <td
+                        key={column.key || column.dataIndex || colIndex}
+                        className={column.cellClassName}
+                        style={{
+                          ...tdStyle,
+                          textAlign: column.align || 'left'
+                        }}
+                      >
+                        {column.render
+                          ? column.render(value, record, rowIndex)
+                          : value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
+
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

@@ -124,6 +124,7 @@ export const VMProvider = ({ children }) => {
     dispatch({ type: 'FETCH_VMS_REQUEST' });
     
     try {
+      // Đã đúng, giữ nguyên getVMs
       const vms = await vmService.getVMs();
       dispatch({ type: 'FETCH_VMS_SUCCESS', payload: vms });
       return vms;

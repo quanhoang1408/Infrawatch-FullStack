@@ -1,17 +1,106 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
-import { Spinner } from '../../components/common/Spinner';
-import { ErrorState } from '../../components/common/ErrorState';
-import { Search } from '../../components/common/Search';
-import { EmptyState } from '../../components/common/EmptyState';
-import { VMLogViewer } from '../../components/vm/VMLogViewer';
+import Card from '../../components/common/Card';
+import Button from '../../components/common/Button';
+import Spinner from '../../components/common/Spinner';
+import ErrorState from '../../components/common/ErrorState';
 import { useVM } from '../../hooks/useVM';
 import { formatDate } from '../../utils/format.utils';
 
+// Temporary Search component
+const Search = ({ placeholder, value, onChange, onClear }) => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    padding: '0 8px',
+    backgroundColor: '#fff'
+  }}>
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        border: 'none',
+        padding: '8px',
+        width: '100%',
+        outline: 'none'
+      }}
+    />
+    {value && (
+      <button
+        onClick={onClear}
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '16px',
+          color: '#999'
+        }}
+      >
+        ×
+      </button>
+    )}
+  </div>
+);
+
+// Temporary EmptyState component
+const EmptyState = ({ title, message, action }) => (
+  <div style={{
+    textAlign: 'center',
+    padding: '40px 20px',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '4px'
+  }}>
+    <h3 style={{ margin: '0 0 8px 0', color: '#666' }}>{title}</h3>
+    <p style={{ margin: '0 0 16px 0', color: '#888' }}>{message}</p>
+    {action}
+  </div>
+);
+
+// Temporary VMLogViewer component
+const VMLogViewer = ({ logs }) => (
+  <div style={{
+    fontFamily: 'monospace',
+    fontSize: '13px',
+    backgroundColor: '#f5f5f5',
+    padding: '12px',
+    borderRadius: '4px',
+    height: '400px',
+    overflowY: 'auto'
+  }}>
+    {logs.map((log, index) => (
+      <div key={index} style={{
+        padding: '4px 0',
+        borderBottom: '1px solid #eee',
+        color: log.severity === 'error' ? '#d32f2f' :
+               log.severity === 'warning' ? '#f57c00' :
+               log.severity === 'info' ? '#0288d1' : '#333'
+      }}>
+        <span style={{ color: '#666', marginRight: '8px' }}>
+          [{new Date(log.timestamp).toLocaleTimeString()}]
+        </span>
+        <span style={{
+          fontWeight: 'bold',
+          marginRight: '8px',
+          padding: '2px 4px',
+          borderRadius: '2px',
+          backgroundColor: log.severity === 'error' ? '#ffebee' :
+                          log.severity === 'warning' ? '#fff3e0' :
+                          log.severity === 'info' ? '#e1f5fe' : 'transparent'
+        }}>
+          {log.severity.toUpperCase()}
+        </span>
+        <span>{log.message}</span>
+      </div>
+    ))}
+  </div>
+);
+
 const LogsTab = ({ vmId }) => {
   const { getVMLogs, loading, error } = useVM();
-  
+
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,10 +110,10 @@ const LogsTab = ({ vmId }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [isAutoRefresh, setIsAutoRefresh] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
-  
+
   const autoRefreshIntervalRef = useRef(null);
   const logsPerPage = 100;
-  
+
   // Log types available for selection
   const logTypes = [
     { id: 'system', label: 'System Logs' },
@@ -32,7 +121,7 @@ const LogsTab = ({ vmId }) => {
     { id: 'security', label: 'Security Logs' },
     { id: 'ssh', label: 'SSH Logs' }
   ];
-  
+
   // Time range options
   const timeRangeOptions = [
     { id: '1h', label: 'Last Hour' },
@@ -41,7 +130,7 @@ const LogsTab = ({ vmId }) => {
     { id: '7d', label: 'Last Week' },
     { id: '30d', label: 'Last Month' }
   ];
-  
+
   // Log severity classes for styling
   const getSeverityClass = (severity) => {
     switch (severity.toLowerCase()) {
@@ -57,7 +146,7 @@ const LogsTab = ({ vmId }) => {
         return '';
     }
   };
-  
+
   // Fetch logs based on current filters
   const fetchLogs = async () => {
     try {
@@ -67,10 +156,10 @@ const LogsTab = ({ vmId }) => {
         page: page,
         limit: logsPerPage
       });
-      
+
       setLogs(logsData.logs);
       setTotalPages(Math.ceil(logsData.total / logsPerPage));
-      
+
       // Apply search filter if active
       if (searchTerm) {
         filterLogs(logsData.logs, searchTerm);
@@ -81,7 +170,7 @@ const LogsTab = ({ vmId }) => {
       console.error('Error fetching VM logs:', err);
     }
   };
-  
+
   // Handle log filtering by search term
   const filterLogs = (logsToFilter, term) => {
     if (!term) {
@@ -89,80 +178,80 @@ const LogsTab = ({ vmId }) => {
       setSearchActive(false);
       return;
     }
-    
-    const filtered = logsToFilter.filter(log => 
+
+    const filtered = logsToFilter.filter(log =>
       log.message.toLowerCase().includes(term.toLowerCase()) ||
       log.severity.toLowerCase().includes(term.toLowerCase())
     );
-    
+
     setFilteredLogs(filtered);
     setSearchActive(true);
   };
-  
+
   // Initial fetch and setup auto-refresh if enabled
   useEffect(() => {
     fetchLogs();
-    
+
     // Setup auto-refresh
     if (isAutoRefresh) {
       autoRefreshIntervalRef.current = setInterval(() => {
         fetchLogs();
       }, 10000); // Refresh every 10 seconds
     }
-    
+
     return () => {
       if (autoRefreshIntervalRef.current) {
         clearInterval(autoRefreshIntervalRef.current);
       }
     };
   }, [vmId, selectedLogType, timeRange, page, isAutoRefresh]);
-  
+
   // Handle search term changes
   useEffect(() => {
     filterLogs(logs, searchTerm);
   }, [searchTerm]);
-  
+
   // Handle log type change
   const handleLogTypeChange = (type) => {
     setSelectedLogType(type);
     setPage(1);
   };
-  
+
   // Handle time range change
   const handleTimeRangeChange = (range) => {
     setTimeRange(range);
     setPage(1);
   };
-  
+
   // Handle pagination
   const handlePageChange = (newPage) => {
     setPage(newPage);
   };
-  
+
   // Toggle auto-refresh
   const toggleAutoRefresh = () => {
     setIsAutoRefresh(prev => !prev);
   };
-  
+
   // Handle search
   const handleSearch = (term) => {
     setSearchTerm(term);
   };
-  
+
   // Clear search
   const clearSearch = () => {
     setSearchTerm('');
     setSearchActive(false);
     setFilteredLogs(logs);
   };
-  
+
   // Download logs
   const downloadLogs = () => {
     const logsToDownload = searchActive ? filteredLogs : logs;
-    const content = logsToDownload.map(log => 
+    const content = logsToDownload.map(log =>
       `[${log.timestamp}] [${log.severity}] ${log.message}`
     ).join('\n');
-    
+
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -173,7 +262,7 @@ const LogsTab = ({ vmId }) => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  
+
   // Loading state
   if (loading && !logs.length) {
     return (
@@ -183,17 +272,17 @@ const LogsTab = ({ vmId }) => {
       </div>
     );
   }
-  
+
   // Error state
   if (error) {
     return (
-      <ErrorState 
+      <ErrorState
         title="Failed to load logs"
         message={error.message}
       />
     );
   }
-  
+
   return (
     <div className="logs-tab">
       <div className="logs-controls">
@@ -213,10 +302,10 @@ const LogsTab = ({ vmId }) => {
               ))}
             </div>
           </div>
-          
+
           <div className="time-range-filter">
             <label>Time Range</label>
-            <select 
+            <select
               value={timeRange}
               onChange={(e) => handleTimeRangeChange(e.target.value)}
               className="time-range-select"
@@ -229,15 +318,15 @@ const LogsTab = ({ vmId }) => {
             </select>
           </div>
         </div>
-        
+
         <div className="logs-actions">
-          <Search 
+          <Search
             placeholder="Search logs..."
             value={searchTerm}
             onChange={handleSearch}
             onClear={clearSearch}
           />
-          
+
           <Button
             variant="secondary"
             icon={isAutoRefresh ? 'pause' : 'play'}
@@ -246,7 +335,7 @@ const LogsTab = ({ vmId }) => {
           >
             {isAutoRefresh ? 'Pause' : 'Auto-refresh'}
           </Button>
-          
+
           <Button
             variant="secondary"
             icon="download"
@@ -255,7 +344,7 @@ const LogsTab = ({ vmId }) => {
           >
             Download
           </Button>
-          
+
           <Button
             variant="secondary"
             icon="refresh"
@@ -266,7 +355,7 @@ const LogsTab = ({ vmId }) => {
           </Button>
         </div>
       </div>
-      
+
       <Card title={`${logTypes.find(t => t.id === selectedLogType)?.label} ${searchActive ? `- Search Results (${filteredLogs.length})` : ''}`}>
         {loading && (
           <div className="logs-refreshing">
@@ -274,12 +363,12 @@ const LogsTab = ({ vmId }) => {
             <span>Refreshing logs...</span>
           </div>
         )}
-        
+
         {(!filteredLogs || filteredLogs.length === 0) ? (
           <EmptyState
             title="No logs found"
             message={
-              searchActive 
+              searchActive
                 ? `No logs matching "${searchTerm}"`
                 : "No logs available for the selected time range"
             }
@@ -298,7 +387,7 @@ const LogsTab = ({ vmId }) => {
           <VMLogViewer logs={filteredLogs} />
         )}
       </Card>
-      
+
       {totalPages > 1 && (
         <div className="logs-pagination">
           <Button
@@ -308,7 +397,7 @@ const LogsTab = ({ vmId }) => {
           >
             First
           </Button>
-          
+
           <Button
             variant="text"
             disabled={page === 1}
@@ -316,11 +405,11 @@ const LogsTab = ({ vmId }) => {
           >
             Previous
           </Button>
-          
+
           <span className="page-indicator">
             Page {page} of {totalPages}
           </span>
-          
+
           <Button
             variant="text"
             disabled={page === totalPages}
@@ -328,7 +417,7 @@ const LogsTab = ({ vmId }) => {
           >
             Next
           </Button>
-          
+
           <Button
             variant="text"
             disabled={page === totalPages}
