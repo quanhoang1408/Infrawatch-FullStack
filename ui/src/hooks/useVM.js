@@ -188,6 +188,136 @@ export const useVM = () => {
     }
   };
 
+  /**
+   * Lấy thông tin bảo mật của một máy ảo
+   *
+   * @param {string} vmId - ID của máy ảo
+   * @returns {Object} Thông tin bảo mật của máy ảo
+   */
+  const getVMSecurityDetails = async (vmId) => {
+    console.log('useVM - getVMSecurityDetails called with vmId:', vmId);
+
+    if (!vmId) {
+      const error = new Error('VM ID is required');
+      console.error('useVM - getVMSecurityDetails error:', error);
+      throw error;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Trong thực tế, sẽ gọi API để lấy thông tin bảo mật
+      // const securityDetails = await vmService.getVMSecurityDetails(vmId);
+
+      // Sử dụng mock data tạm thời
+      const securityDetails = {
+        passwordAuth: true,
+        rootLogin: false,
+        autoUpdates: true,
+        firewallEnabled: true,
+        sshKeys: [
+          {
+            id: 'key-1',
+            name: 'Development Key',
+            fingerprint: 'SHA256:abcdefghijklmnopqrstuvwxyz1234567890ABCDEF',
+            addedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            lastUsed: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            id: 'key-2',
+            name: 'Production Key',
+            fingerprint: 'SHA256:123456789abcdefghijklmnopqrstuvwxyzABCDEF',
+            addedAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+            lastUsed: null
+          }
+        ],
+        certificates: [
+          {
+            id: 'cert-1',
+            name: 'Development Certificate',
+            status: 'active',
+            issuedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+            expiresAt: new Date(Date.now() + 75 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ],
+        securityScans: [
+          {
+            id: 'scan-1',
+            scanDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            status: 'completed',
+            vulnerabilities: 3,
+            criticalVulnerabilities: 1
+          },
+          {
+            id: 'scan-2',
+            scanDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+            status: 'completed',
+            vulnerabilities: 5,
+            criticalVulnerabilities: 2
+          }
+        ]
+      };
+
+      return securityDetails;
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || `Không thể tải thông tin bảo mật của máy ảo ID: ${vmId}`;
+      setError(errorMessage);
+      showError('Lỗi tải thông tin bảo mật', errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Cập nhật cài đặt bảo mật của một máy ảo
+   *
+   * @param {string} vmId - ID của máy ảo
+   * @param {Object} updateData - Dữ liệu cập nhật
+   * @returns {Object} Kết quả cập nhật
+   */
+  const updateVMSecurity = async (vmId, updateData) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Trong thực tế, sẽ gọi API để cập nhật cài đặt bảo mật
+      // const result = await vmService.updateVMSecurity(vmId, updateData);
+
+      // Sử dụng mock data tạm thời
+      let result = { success: true };
+
+      // Xử lý các loại hành động khác nhau
+      if (updateData.action === 'addSSHKey') {
+        result.key = {
+          id: 'key-' + Date.now(),
+          name: updateData.keyName,
+          fingerprint: 'SHA256:' + Math.random().toString(36).substring(2, 15),
+          addedAt: new Date().toISOString(),
+          lastUsed: null
+        };
+      } else if (updateData.action === 'runSecurityScan') {
+        result.scan = {
+          id: 'scan-' + Date.now(),
+          scanDate: new Date().toISOString(),
+          status: 'in-progress',
+          vulnerabilities: 0,
+          criticalVulnerabilities: 0
+        };
+      }
+
+      return result;
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || `Không thể cập nhật cài đặt bảo mật của máy ảo ID: ${vmId}`;
+      setError(errorMessage);
+      showError('Lỗi cập nhật cài đặt bảo mật', errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Use context loading and error states if local ones are not set
   const finalLoading = loading || (isLoading && !loading);
   const finalError = error || (contextError && !error);
@@ -205,6 +335,8 @@ export const useVM = () => {
     fetchVMLogs,
     filterVMs,
     clearFilters,
-    updateVM
+    updateVM,
+    getVMSecurityDetails,
+    updateVMSecurity
   };
 };

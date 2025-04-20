@@ -14,19 +14,33 @@ const Providers = () => {
   const [error, setError] = useState(null);
   const [isAddingProvider, setIsAddingProvider] = useState(false);
   const [addingInProgress, setAddingInProgress] = useState(false);
-  
+
   // Fetch providers on component mount
   useEffect(() => {
     fetchProviders();
   }, []);
-  
+
   // Function to fetch providers
   const fetchProviders = async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await providerService.getProviders();
-      setProviders(data);
+
+      // Debug data
+      console.log('Providers data:', data);
+      console.log('Is array:', Array.isArray(data));
+
+      // Ensure providers is always an array
+      if (Array.isArray(data)) {
+        setProviders(data);
+      } else if (data && typeof data === 'object' && data.data && Array.isArray(data.data)) {
+        // Handle case where API returns { data: [...] }
+        setProviders(data.data);
+      } else {
+        console.warn('API returned invalid data format for providers');
+        setProviders([]);
+      }
     } catch (err) {
       console.error('Error fetching providers:', err);
       setError(err);
@@ -34,7 +48,7 @@ const Providers = () => {
       setLoading(false);
     }
   };
-  
+
   // Function to add a new provider
   const handleAddProvider = async (providerData) => {
     try {
@@ -50,7 +64,7 @@ const Providers = () => {
       setAddingInProgress(false);
     }
   };
-  
+
   // Function to delete a provider
   const handleDeleteProvider = async (providerId) => {
     try {
@@ -62,7 +76,7 @@ const Providers = () => {
       toast.error(err.response?.data?.message || 'Failed to remove provider');
     }
   };
-  
+
   // Render content based on state
   const renderContent = () => {
     if (loading) {
@@ -72,10 +86,10 @@ const Providers = () => {
         </div>
       );
     }
-    
+
     if (error) {
       return (
-        <ErrorState 
+        <ErrorState
           title="Failed to load providers"
           message="There was an error fetching the provider configurations. Please try again."
           error={error}
@@ -83,10 +97,10 @@ const Providers = () => {
         />
       );
     }
-    
+
     if (providers.length === 0 && !isAddingProvider) {
       return (
-        <EmptyState 
+        <EmptyState
           title="No providers configured"
           message="Add a cloud provider to start managing your virtual machines."
           actionButton={
@@ -97,12 +111,12 @@ const Providers = () => {
         />
       );
     }
-    
+
     return (
       <>
         {isAddingProvider ? (
-          <ProviderForm 
-            onSubmit={handleAddProvider} 
+          <ProviderForm
+            onSubmit={handleAddProvider}
             onCancel={() => setIsAddingProvider(false)}
             loading={addingInProgress}
           />
@@ -110,10 +124,10 @@ const Providers = () => {
           <>
             <div className="providers__grid">
               {providers.map(provider => (
-                <ProviderCard 
-                  key={provider.id} 
-                  provider={provider} 
-                  onDelete={handleDeleteProvider} 
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  onDelete={handleDeleteProvider}
                 />
               ))}
             </div>
@@ -122,15 +136,15 @@ const Providers = () => {
       </>
     );
   };
-  
+
   return (
     <div className="providers">
       <div className="providers__header">
         <h1 className="providers__title">Cloud Providers</h1>
         {!isAddingProvider && providers.length > 0 && (
           <div className="providers__actions">
-            <button 
-              onClick={() => setIsAddingProvider(true)} 
+            <button
+              onClick={() => setIsAddingProvider(true)}
               className="btn btn--primary"
             >
               Add Provider
@@ -138,7 +152,7 @@ const Providers = () => {
           </div>
         )}
       </div>
-      
+
       <div className="providers__content">
         {renderContent()}
       </div>

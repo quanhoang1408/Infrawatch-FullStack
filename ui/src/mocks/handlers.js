@@ -120,7 +120,7 @@ export const handlers = [
   }),
   
   // VM endpoints
-  rest.get('/api/vms', (req, res, ctx) => {
+  rest.get('/api/vm', (req, res, ctx) => {
     // Get query parameters
     const status = req.url.searchParams.get('status');
     const provider = req.url.searchParams.get('provider');
@@ -153,7 +153,7 @@ export const handlers = [
     );
   }),
   
-  rest.get('/api/vms/:id', (req, res, ctx) => {
+  rest.get('/api/vm/:id', (req, res, ctx) => {
     const { id } = req.params;
     const vm = mockVMs.find(vm => vm.id === id);
     

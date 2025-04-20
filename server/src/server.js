@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const app = require('./app');
 const config = require('./config');
 const { initJobs } = require('./jobs');
+const { initializeVault } = require('./middleware/vault.middleware');
 
 let server;
 

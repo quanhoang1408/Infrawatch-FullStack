@@ -7,6 +7,7 @@ const morgan = require('morgan');
 const routes = require('./api');
 const config = require('./config');
 const { errorConverter, errorHandler }= require('./middleware/error.middleware');
+const vault = require('./middleware/vault.middleware');
 
 const app = express();
 
@@ -22,8 +23,15 @@ app.use(express.urlencoded({ extended: true }));
 // Compress response
 app.use(compression());
 
-// Enable CORS
-app.use(cors());
+// Enable CORS with specific options
+app.use(cors({
+  origin: '*', // Allow all origins, or specify your frontend URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
 
 // Http request logger
 if (config.env !== 'test') {
@@ -35,6 +43,17 @@ app.use('/api', routes);
 
 // Health check
 app.get('/health', (req, res) => res.status(200).send({ status: 'ok' }));
+
+// Vault test endpoint
+app.get('/test-vault', async (req, res) => {
+  try {
+    await vault.write('secret/test', { foo: 'bar' });
+    const result = await vault.read('secret/test');
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Error handling
 app.use(errorHandler);

@@ -5,6 +5,7 @@ const Token = require('./token.model');
 const Monitoring = require('./monitoring.model');
 const Activity = require('./activity.model');
 const Provider = require('./provider.model');
+const Command = require('./command.model');
 // Import additional models as needed
 
 module.exports = {
@@ -14,4 +15,5 @@ module.exports = {
   Monitoring,
   Activity,
   Provider,
+  Command,
 };

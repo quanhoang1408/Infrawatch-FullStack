@@ -6,6 +6,7 @@ const adminRoutes = require('./admin');
 const activityRoutes = require('./activities/activity.routes');
 const monitoringRoute = require('./monitoring/monitoring.routes');
 const eventsRoutes = require('./events/events.routes');
+const agentRoutes = require('./agent/agent.routes');
 
 const router = express.Router();
 
@@ -15,5 +16,6 @@ router.use('/admin', adminRoutes);
 router.use('/activities', activityRoutes);
 router.use('/monitoring', monitoringRoute);
 router.use('/events', eventsRoutes);
+router.use('/agent', agentRoutes);
 
 module.exports = router;

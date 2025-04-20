@@ -8,6 +8,15 @@ const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1';
 // Log the API URL in development
 if (process.env.NODE_ENV === 'development') {
   console.log('API Base URL:', baseURL);
+  console.log('Environment variables:', process.env);
+}
+
+// Check if the URL is valid
+try {
+  new URL(baseURL);
+  console.log('API URL is valid');
+} catch (error) {
+  console.error('Invalid API URL:', baseURL, error);
 }
 
 const api = axios.create({
@@ -15,7 +24,26 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Add CORS settings
+  withCredentials: false,
+  timeout: 10000, // 10 seconds timeout
 });
+
+// Log all requests in development
+if (process.env.NODE_ENV === 'development') {
+  axios.interceptors.request.use(request => {
+    console.log('Starting Request', JSON.stringify(request, null, 2));
+    return request;
+  });
+
+  axios.interceptors.response.use(response => {
+    console.log('Response:', JSON.stringify(response.data, null, 2));
+    return response;
+  }, error => {
+    console.error('Response Error:', error);
+    return Promise.reject(error);
+  });
+}
 
 // Request interceptor for adding auth token
 api.interceptors.request.use(
@@ -24,7 +52,7 @@ api.interceptors.request.use(
     if (process.env.NODE_ENV === 'development') {
       console.log(`${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
     }
-    
+
     const token = getAccessToken();
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -38,8 +66,18 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Enhanced error logging
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+
     const originalRequest = error.config;
-    
+
     // If error is not 401 or request has already been retried, reject
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
@@ -60,13 +98,13 @@ api.interceptors.response.use(
       });
 
       const { access, refresh } = response.data;
-      
+
       // Save new tokens
       setTokens(access.token, refresh.token);
-      
+
       // Update the authorization header
       originalRequest.headers['Authorization'] = `Bearer ${access.token}`;
-      
+
       // Retry the original request
       return api(originalRequest);
     } catch (refreshError) {

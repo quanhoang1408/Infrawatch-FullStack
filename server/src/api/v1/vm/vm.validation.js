@@ -20,8 +20,18 @@ const vmAction = {
   }),
 };
 
+const updateSSHKey = {
+  params: Joi.object().keys({
+    vmId: Joi.string().custom(objectId).required(),
+  }),
+  body: Joi.object().keys({
+    sshUser: Joi.string().required(),
+  }),
+};
+
 module.exports = {
   getVM,
   syncVMs,
   vmAction,
+  updateSSHKey,
 };

@@ -2,13 +2,14 @@
 const express = require('express');
 const validate = require('../../../middleware/validator.middleware');
 const auth = require('../../../middleware/auth.middleware');
+const rbac = require('../../../middleware/rbac.middleware');
 const vmController = require('./vm.controller');
 const vmValidation = require('./vm.validation');
 
 const router = express.Router();
 
 router
-  .route('/')
+  .route('/')  // This becomes /vms because of how it's mounted
   .get(
     auth(),
     vmController.getVMs
@@ -52,6 +53,15 @@ router
     auth(),
     validate(vmValidation.vmAction),
     vmController.rebootVM
+  );
+
+router
+  .route('/:vmId/ssh-key/update')
+  .post(
+    auth(),
+    rbac(['admin']),
+    validate(vmValidation.updateSSHKey),
+    vmController.updateSSHKey
   );
 
 module.exports = router;

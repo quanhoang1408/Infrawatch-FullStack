@@ -5,6 +5,8 @@ const providerService = require('./provider.service');
 const activityService = require('./activity.service');
 const monitoringService = require('./monitoring.service');
 const agentService = require('./agent.service');
+const commandService = require('./command.service');
+const vaultService = require('./vault.service');
 // Import additional services as needed
 
 module.exports = {
@@ -14,4 +16,6 @@ module.exports = {
   activity: activityService,
   monitoring: monitoringService,
   agent: agentService,
+  command: commandService,
+  vault: vaultService,
 };

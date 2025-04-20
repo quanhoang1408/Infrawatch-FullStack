@@ -140,7 +140,9 @@ const VMDetail = () => {
   const navigate = useNavigate();
   const { getVMDetail, loading, error } = useVM();
   const { startVM, stopVM, restartVM } = useVMActions();
-  const { showNotification } = useNotification();
+  const { showSuccess, showError } = useNotification();
+
+  console.log('VMDetail component - vmId:', vmId);
 
   const [vm, setVM] = useState(null);
   const [activeTab, setActiveTab] = useState('info');
@@ -148,9 +150,47 @@ const VMDetail = () => {
   const [actionType, setActionType] = useState('');
 
   useEffect(() => {
+    // Kiểm tra và log giá trị của vmId từ URL
+    console.log('VMDetail - vmId from URL params:', vmId);
+    console.log('VMDetail - vmId type:', typeof vmId);
+
+    // Nếu vmId là undefined hoặc null, thử lấy từ URL trực tiếp
+    if (!vmId) {
+      const pathParts = window.location.pathname.split('/');
+      const possibleVmId = pathParts[pathParts.length - 1];
+      console.log('VMDetail - Trying to extract vmId from URL:', possibleVmId);
+
+      // Nếu có thể lấy được vmId từ URL, sử dụng nó
+      if (possibleVmId && possibleVmId !== 'undefined') {
+        console.log('VMDetail - Using vmId from URL:', possibleVmId);
+        // Không thể set vmId trực tiếp vì nó đến từ useParams, nhưng chúng ta có thể sử dụng nó
+        const fetchVMWithId = async (id) => {
+          try {
+            console.log('VMDetail - Fetching VM with ID:', id);
+            const vmData = await getVMDetail(id);
+            console.log('VMDetail - fetchVM result:', vmData);
+            setVM(vmData);
+          } catch (error) {
+            console.error('Error fetching VM details:', error);
+          }
+        };
+
+        fetchVMWithId(possibleVmId);
+        return;
+      }
+    }
+
     const fetchVM = async () => {
+      if (!vmId) {
+        console.error('vmId is null or undefined in fetchVM');
+        return;
+      }
+
+      console.log('VMDetail - fetchVM for vmId:', vmId);
+
       try {
         const vmData = await getVMDetail(vmId);
+        console.log('VMDetail - fetchVM result:', vmData);
         setVM(vmData);
       } catch (error) {
         console.error('Error fetching VM details:', error);
@@ -181,24 +221,15 @@ const VMDetail = () => {
       switch (actionType) {
         case 'start':
           result = await startVM(vmId);
-          showNotification({
-            type: 'success',
-            message: 'Virtual machine started successfully'
-          });
+          showSuccess('Virtual machine started successfully');
           break;
         case 'stop':
           result = await stopVM(vmId);
-          showNotification({
-            type: 'success',
-            message: 'Virtual machine stopped successfully'
-          });
+          showSuccess('Virtual machine stopped successfully');
           break;
         case 'restart':
           result = await restartVM(vmId);
-          showNotification({
-            type: 'success',
-            message: 'Virtual machine restarted successfully'
-          });
+          showSuccess('Virtual machine restarted successfully');
           break;
         default:
           break;
@@ -209,10 +240,7 @@ const VMDetail = () => {
         setVM(prev => ({ ...prev, status: result.status }));
       }
     } catch (error) {
-      showNotification({
-        type: 'error',
-        message: `Failed to ${actionType} virtual machine: ${error.message}`
-      });
+      showError(`Failed to ${actionType} virtual machine: ${error.message}`);
     } finally {
       setShowConfirmModal(false);
     }
@@ -232,7 +260,12 @@ const VMDetail = () => {
   };
 
   const getTabContent = () => {
-    if (!vm) return null;
+    if (!vm) {
+      console.error('VM is null or undefined in getTabContent');
+      return null;
+    }
+
+    console.log('VMDetail - getTabContent - vm:', vm);
 
     switch (activeTab) {
       case 'info':
@@ -246,6 +279,7 @@ const VMDetail = () => {
       case 'storage':
         return <StorageTab vm={vm} />;
       case 'security':
+        console.log('VMDetail - Rendering SecurityTab with vm:', vm);
         return <SecurityTab vm={vm} />;
       default:
         return null;

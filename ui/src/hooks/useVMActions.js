@@ -332,6 +332,48 @@ export const useVMActions = () => {
     }
   };
 
+  /**
+   * Cập nhật SSH key cho máy ảo
+   *
+   * @param {string} vmId - ID của máy ảo
+   * @param {string} sshUser - Tên người dùng SSH
+   * @returns {Promise<Object>} Kết quả thực hiện
+   */
+  const updateSSHKey = async (vmId, sshUser) => {
+    console.log('useVMActions - updateSSHKey called with vmId:', vmId, 'and sshUser:', sshUser);
+    setLoading(true);
+    setActionInProgress('updateSSHKey');
+
+    try {
+      if (!vmId) {
+        throw new Error('VM ID is required');
+      }
+
+      if (!sshUser) {
+        throw new Error('SSH username is required');
+      }
+
+      const vm = vms.find(vm => vm.id === vmId);
+      const vmName = vm?.name || vmId;
+
+      console.log('Calling updateSSHKey API with vmId:', vmId, 'and sshUser:', sshUser);
+      const result = await vmService.updateSSHKey(vmId, { sshUser });
+      showSuccess(
+        'Cập nhật SSH key',
+        `Lệnh cập nhật SSH key cho người dùng ${sshUser} trên máy ảo ${vmName} đã được gửi thành công`
+      );
+
+      return result;
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || `Không thể cập nhật SSH key cho máy ảo ID: ${vmId}`;
+      showError('Lỗi cập nhật SSH key', errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+      setActionInProgress(null);
+    }
+  };
+
   return {
     loading,
     actionInProgress,
@@ -343,7 +385,8 @@ export const useVMActions = () => {
     resizeVM,
     createVMSnapshot,
     restoreVMSnapshot,
-    updateSSHCertificate
+    updateSSHCertificate,
+    updateSSHKey
   };
 };
 

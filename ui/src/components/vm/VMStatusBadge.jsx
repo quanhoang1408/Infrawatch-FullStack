@@ -2,8 +2,11 @@ import React from 'react';
 import './VMStatusBadge.scss';
 
 const VMStatusBadge = ({ status }) => {
+  // Handle undefined or null status
+  const safeStatus = status || 'unknown';
+
   const getStatusClass = () => {
-    switch (status.toLowerCase()) {
+    switch (safeStatus.toLowerCase()) {
       case 'running':
         return 'vm-status--success';
       case 'stopped':
@@ -20,7 +23,7 @@ const VMStatusBadge = ({ status }) => {
   };
 
   const getStatusIcon = () => {
-    switch (status.toLowerCase()) {
+    switch (safeStatus.toLowerCase()) {
       case 'running':
         return (
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -58,7 +61,7 @@ const VMStatusBadge = ({ status }) => {
   return (
     <div className={`vm-status ${getStatusClass()}`}>
       <span className="vm-status__icon">{getStatusIcon()}</span>
-      <span className="vm-status__text">{status}</span>
+      <span className="vm-status__text">{safeStatus}</span>
     </div>
   );
 };

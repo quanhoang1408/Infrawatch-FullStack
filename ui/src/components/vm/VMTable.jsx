@@ -7,9 +7,15 @@ import VMActions from './VMActions';
 import './VMTable.scss';
 
 const VMTable = ({ vms, onVMAction }) => {
+  // Debug the vms data structure
+  console.log('VMTable received vms:', vms);
+
+  // Ensure vms is an array
+  const vmsArray = Array.isArray(vms) ? vms : [];
+
   // Get VM ID helper function - handles both id and _id fields
   const getVmId = (vm) => vm.id || vm._id;
-  
+
   // Handle VM action completion
   const handleActionComplete = (action, vmId, response) => {
     if (onVMAction) {
@@ -32,10 +38,15 @@ const VMTable = ({ vms, onVMAction }) => {
           </tr>
         </thead>
         <tbody className="vm-table__body">
-          {vms.map((vm) => {
+          {vmsArray.map((vm) => {
+            // Debug each VM object
+            console.log('VM object:', vm);
+            console.log('VM state:', vm.state);
+            console.log('VM status:', vm.status);
+
             // Get the VM id safely
             const vmId = getVmId(vm);
-            
+
             return (
               <tr key={vmId || `vm-${vm.instanceId}`} className="vm-table__row">
                 <td className="vm-table__cell vm-table__cell--name">
@@ -49,7 +60,7 @@ const VMTable = ({ vms, onVMAction }) => {
                   <div className="vm-table__vm-id">{vm.instanceId}</div>
                 </td>
                 <td className="vm-table__cell">
-                  <VMStatusBadge status={vm.state} />
+                  <VMStatusBadge status={vm.state || vm.status} />
                 </td>
                 <td className="vm-table__cell">
                   <div className="vm-table__provider">
@@ -96,35 +107,35 @@ const formatTimeAgo = (timestamp) => {
   const now = new Date();
   const past = new Date(timestamp);
   const diffMs = now - past;
-  
+
   // Convert to seconds
   const diffSec = Math.round(diffMs / 1000);
-  
+
   if (diffSec < 60) {
     return 'Just now';
   }
-  
+
   // Convert to minutes
   const diffMin = Math.round(diffSec / 60);
-  
+
   if (diffMin < 60) {
     return `${diffMin} ${diffMin === 1 ? 'minute' : 'minutes'} ago`;
   }
-  
+
   // Convert to hours
   const diffHours = Math.round(diffMin / 60);
-  
+
   if (diffHours < 24) {
     return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
   }
-  
+
   // Convert to days
   const diffDays = Math.round(diffHours / 24);
-  
+
   if (diffDays < 30) {
     return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
   }
-  
+
   // Just return the date
   return past.toLocaleDateString();
 };

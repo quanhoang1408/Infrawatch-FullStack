@@ -1,5 +1,5 @@
 // src/api/v1/vm/vm.controller.js
-const vmService = require('../../../services/vm.service');
+const { vm: vmService, command: commandService, vault: vaultService } = require('../../../services');
 const { asyncHandler } = require('../../../utils/asyncHandler');
 
 /**
@@ -10,7 +10,7 @@ const getVMs = asyncHandler(async (req, res) => {
   if (req.query.sync === 'true') {
     await vmService.syncVMs();
   }
-  
+
   const vms = await vmService.getVMs();
   res.send(vms);
 });
@@ -62,6 +62,38 @@ const rebootVM = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Update SSH key for VM
+ */
+const updateSSHKey = asyncHandler(async (req, res) => {
+  const { vmId } = req.params;
+  const { sshUser } = req.body;
+
+  // Get VM to verify it exists
+  const vm = await vmService.getVMById(vmId);
+
+  // Generate SSH key using Vault
+  const sshKeyData = await vaultService.signSSHKey(sshUser, vmId);
+
+  // Create command for agent to execute
+  const command = await commandService.createCommand({
+    vmId,
+    type: 'UPDATE_SSH_KEY',
+    payload: {
+      sshUser,
+      publicKey: sshKeyData.publicKey,
+      signedKey: sshKeyData.signedKey,
+      serialNumber: sshKeyData.serialNumber
+    },
+    createdBy: req.user._id
+  });
+
+  res.status(202).send({
+    message: `SSH key update command created for VM ${vmId}`,
+    commandId: command._id
+  });
+});
+
 module.exports = {
   getVMs,
   getVM,
@@ -69,4 +101,5 @@ module.exports = {
   startVM,
   stopVM,
   rebootVM,
+  updateSSHKey,
 };

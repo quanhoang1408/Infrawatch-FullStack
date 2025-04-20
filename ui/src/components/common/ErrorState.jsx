@@ -32,6 +32,40 @@ const ErrorState = ({
       {error && error.message && (
         <div style={{ padding: '8px', backgroundColor: '#ffebee', borderRadius: '4px', marginBottom: '16px' }}>
           <p style={{ margin: 0, color: '#c62828', fontSize: '0.875rem' }}>{error.message}</p>
+          {error.details && (
+            <p style={{ margin: '8px 0 0 0', color: '#c62828', fontSize: '0.875rem' }}>{error.details}</p>
+          )}
+
+          {/* Show special instructions for ngrok errors */}
+          {error.message && error.message.includes('ngrok') && (
+            <div style={{ marginTop: '12px', textAlign: 'left' }}>
+              <p style={{ fontWeight: 'bold', margin: '8px 0', color: '#c62828' }}>How to fix:</p>
+              <ol style={{ margin: '0', paddingLeft: '20px', color: '#c62828' }}>
+                <li style={{ margin: '4px 0' }}>Open the ngrok URL in a new browser tab</li>
+                <li style={{ margin: '4px 0' }}>Click "Visit Site" to accept the warning</li>
+                <li style={{ margin: '4px 0' }}>Return to this page and click "Try Again"</li>
+              </ol>
+              <div style={{ marginTop: '12px' }}>
+                <a
+                  href={process.env.REACT_APP_API_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    backgroundColor: '#2196f3',
+                    color: 'white',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    textDecoration: 'none',
+                    fontWeight: 'bold',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  Open Ngrok URL
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

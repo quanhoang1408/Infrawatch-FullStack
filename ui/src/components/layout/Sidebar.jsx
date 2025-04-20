@@ -6,7 +6,11 @@ import './Sidebar.scss';
 const Sidebar = ({ collapsed }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  
+
+  // Debug user role
+  console.log('Current user:', user);
+  console.log('Is admin:', isAdmin);
+
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div className="sidebar__header">
@@ -15,12 +19,12 @@ const Sidebar = ({ collapsed }) => {
           <span className="sidebar__logo-text">Infrawatch</span>
         </NavLink>
       </div>
-      
+
       <nav className="sidebar__nav">
         <ul className="sidebar__nav-list">
           <li>
-            <NavLink 
-              to="/dashboard" 
+            <NavLink
+              to="/dashboard"
               className={({ isActive }) => `sidebar__item ${isActive ? 'sidebar__item--active' : ''}`}
             >
               <span className="sidebar__item-icon">
@@ -32,10 +36,10 @@ const Sidebar = ({ collapsed }) => {
               <span className="sidebar__item-text">Dashboard</span>
             </NavLink>
           </li>
-          
+
           <li>
-            <NavLink 
-              to="/vm" 
+            <NavLink
+              to="/vm"
               className={({ isActive }) => `sidebar__item ${isActive ? 'sidebar__item--active' : ''}`}
             >
               <span className="sidebar__item-icon">
@@ -47,11 +51,11 @@ const Sidebar = ({ collapsed }) => {
               <span className="sidebar__item-text">Virtual Machines</span>
             </NavLink>
           </li>
-          
+
           {isAdmin && (
             <li>
-              <NavLink 
-                to="/admin/providers" 
+              <NavLink
+                to="/admin/providers"
                 className={({ isActive }) => `sidebar__item ${isActive ? 'sidebar__item--active' : ''}`}
               >
                 <span className="sidebar__item-icon">
@@ -64,10 +68,10 @@ const Sidebar = ({ collapsed }) => {
               </NavLink>
             </li>
           )}
-          
+
           <li>
-            <NavLink 
-              to="/settings" 
+            <NavLink
+              to="/settings"
               className={({ isActive }) => `sidebar__item ${isActive ? 'sidebar__item--active' : ''}`}
             >
               <span className="sidebar__item-icon">

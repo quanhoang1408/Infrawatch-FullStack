@@ -24,55 +24,45 @@ const authService = {
    */
   login: async (credentials) => {
     try {
-      // For development: Use mock data if API is not available
-      if (process.env.NODE_ENV === 'development') {
-        try {
-          const response = await api.post('/auth/login', credentials);
-          const { user, tokens } = response.data;
+      const response = await api.post('/auth/login', credentials);
+      const { user, tokens } = response.data;
 
-          // Save tokens to storage
-          setTokens(tokens.access.token, tokens.refresh.token);
+      // Save tokens to storage
+      setTokens(tokens.access.token, tokens.refresh.token);
 
-          return { user, tokens };
-        } catch (error) {
-          console.warn('API login failed, using mock data for development');
-
-          // Mock user and tokens for development
-          const mockUser = {
-            id: 'mock-user-id',
-            email: credentials.email,
-            name: 'Test User',
-            role: 'admin'
-          };
-
-          const mockTokens = {
-            access: {
-              token: 'mock-access-token',
-              expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-            },
-            refresh: {
-              token: 'mock-refresh-token',
-              expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          };
-
-          // Save mock tokens to storage
-          setTokens(mockTokens.access.token, mockTokens.refresh.token);
-
-          return { user: mockUser, tokens: mockTokens };
-        }
-      } else {
-        // Production code
-        const response = await api.post('/auth/login', credentials);
-        const { user, tokens } = response.data;
-
-        // Save tokens to storage
-        setTokens(tokens.access.token, tokens.refresh.token);
-
-        return { user, tokens };
-      }
+      return { user, tokens };
     } catch (error) {
       console.error('Login error:', error);
+
+      // Only use mock data in development mode and if explicitly allowed
+      if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+        console.warn('API login failed, using mock data for development');
+
+        // Mock user and tokens for development
+        const mockUser = {
+          id: 'mock-user-id',
+          email: credentials.email,
+          name: 'Test User',
+          role: 'admin'
+        };
+
+        const mockTokens = {
+          access: {
+            token: 'mock-access-token',
+            expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          },
+          refresh: {
+            token: 'mock-refresh-token',
+            expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        };
+
+        // Save mock tokens to storage
+        setTokens(mockTokens.access.token, mockTokens.refresh.token);
+
+        return { user: mockUser, tokens: mockTokens };
+      }
+
       throw error;
     }
   },
@@ -99,29 +89,41 @@ const authService = {
    */
   getCurrentUser: async () => {
     try {
-      // For development: Use mock data if API is not available
-      if (process.env.NODE_ENV === 'development') {
-        try {
-          const response = await api.get('/auth/me');
-          return response.data;
-        } catch (error) {
-          console.warn('API getCurrentUser failed, using mock data for development');
+      const response = await api.get('/auth/me');
+      console.log('getCurrentUser response:', response);
 
-          // Return mock user for development
-          return {
-            id: 'mock-user-id',
-            email: 'test@example.com',
-            name: 'Test User',
-            role: 'admin'
-          };
-        }
-      } else {
-        // Production code
-        const response = await api.get('/auth/me');
-        return response.data;
+      // Check if response is HTML from ngrok
+      if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>') && response.data.includes('ngrok')) {
+        console.error('Received HTML from ngrok instead of JSON. This is likely the ngrok warning page.');
+        console.error('Please open the ngrok URL in a browser first and accept the warning:');
+        console.error(api.defaults.baseURL);
+
+        // Show a more helpful error message
+        const error = new Error('Ngrok requires browser confirmation. Please open the ngrok URL in your browser first.');
+        error.isNgrokError = true;
+        throw error;
       }
+
+      return response.data;
     } catch (error) {
       console.error('Get current user error:', error);
+
+      // Only use mock data in development mode and if explicitly allowed
+      if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+        console.warn('API getCurrentUser failed, using mock data for development');
+        console.error('Error details:', error);
+
+        // Return mock user for development with admin role
+        const mockUser = {
+          id: 'mock-user-id',
+          email: 'test@example.com',
+          name: 'Test User',
+          role: 'admin'  // Đảm bảo role là 'admin' để hiển thị tab Providers
+        };
+        console.log('Using mock user:', mockUser);
+        return mockUser;
+      }
+
       throw error;
     }
   },

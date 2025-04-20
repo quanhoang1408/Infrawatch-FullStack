@@ -1,0 +1,13 @@
+[Server]
+url = http://localhost:3000
+vm_id = your_vm_id_here
+agent_token = your_agent_token_here
+
+[Intervals]
+monitoring = 60
+heartbeat = 30
+command_polling = 15
+
+[Logging]
+level = INFO
+file = ./logs/agent.log

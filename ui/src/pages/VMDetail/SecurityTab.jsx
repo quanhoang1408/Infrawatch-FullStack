@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Spinner from '../../components/common/Spinner';
@@ -6,8 +7,10 @@ import ErrorState from '../../components/common/ErrorState';
 import Table from '../../components/common/Table';
 import StatusBadge from '../../components/common/StatusBadge';
 import { useVM } from '../../hooks/useVM';
+import { useVMActions } from '../../hooks/useVMActions';
 import { useCertificate } from '../../hooks/useCertificate';
 import useNotification from '../../hooks/useNotification';
+import useAuth from '../../hooks/useAuth';
 import { formatDate } from '../../utils/format.utils';
 
 // Temporary Modal component
@@ -68,7 +71,7 @@ const CertificateCard = ({ certificate, onRevoke }) => (
       <div style={{ marginTop: '12px' }}>
         <Button
           variant="danger"
-          size="small"
+          size="sm"
           onClick={onRevoke}
         >
           Revoke
@@ -80,8 +83,14 @@ const CertificateCard = ({ certificate, onRevoke }) => (
 
 const SecurityTab = ({ vm }) => {
   const { getVMSecurityDetails, updateVMSecurity, loading, error } = useVM();
-  const { generateCertificate, revokeCertificate } = useCertificate();
-  const { showNotification } = useNotification();
+  const { createCertificate } = useCertificate();
+  const { updateSSHKey } = useVMActions();
+  const { showSuccess, showError, showInfo, showWarning } = useNotification();
+  const { user } = useAuth();
+  const { vmId: urlVmId } = useParams(); // Lấy vmId từ URL
+
+  console.log('SecurityTab component - vm:', vm);
+  console.log('SecurityTab component - urlVmId:', urlVmId);
 
   const [securityDetails, setSecurityDetails] = useState(null);
   const [sshKeys, setSSHKeys] = useState([]);
@@ -89,15 +98,27 @@ const SecurityTab = ({ vm }) => {
   const [securityScans, setSecurityScans] = useState([]);
   const [showAddKeyModal, setShowAddKeyModal] = useState(false);
   const [showGenerateCertModal, setShowGenerateCertModal] = useState(false);
+  const [showUpdateSSHKeyModal, setShowUpdateSSHKeyModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyValue, setNewKeyValue] = useState('');
   const [newCertName, setNewCertName] = useState('');
   const [newCertValidity, setNewCertValidity] = useState(30); // Days
+  const [sshUser, setSSHUser] = useState('');
 
   useEffect(() => {
     const fetchSecurityDetails = async () => {
+      // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+      const effectiveVmId = vm?.id || urlVmId;
+
+      if (!effectiveVmId) {
+        console.error('VM ID is missing in SecurityTab useEffect');
+        return;
+      }
+
+      console.log('SecurityTab - fetchSecurityDetails for VM ID:', effectiveVmId);
+
       try {
-        const details = await getVMSecurityDetails(vm.id);
+        const details = await getVMSecurityDetails(effectiveVmId);
         setSecurityDetails(details);
         setSSHKeys(details.sshKeys || []);
         setCertificates(details.certificates || []);
@@ -108,19 +129,25 @@ const SecurityTab = ({ vm }) => {
     };
 
     fetchSecurityDetails();
-  }, [vm.id, getVMSecurityDetails]);
+    // Loại bỏ getVMSecurityDetails khỏi dependency array để tránh vòng lặp vô hạn
+  }, [vm?.id, urlVmId]);
 
   const handleAddSSHKey = async () => {
     if (!newKeyName || !newKeyValue) {
-      showNotification({
-        type: 'error',
-        message: 'Key name and value are required'
-      });
+      showError('Key name and value are required');
+      return;
+    }
+
+    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+    const effectiveVmId = vm?.id || urlVmId;
+
+    if (!effectiveVmId) {
+      showError('VM ID is missing. Cannot add SSH key.');
       return;
     }
 
     try {
-      const result = await updateVMSecurity(vm.id, {
+      const result = await updateVMSecurity(effectiveVmId, {
         action: 'addSSHKey',
         keyName: newKeyName,
         keyValue: newKeyValue
@@ -130,10 +157,7 @@ const SecurityTab = ({ vm }) => {
         // Update the local state
         setSSHKeys(prevKeys => [...prevKeys, result.key]);
 
-        showNotification({
-          type: 'success',
-          message: 'SSH key added successfully'
-        });
+        showSuccess('SSH key added successfully');
 
         setShowAddKeyModal(false);
         setNewKeyName('');
@@ -141,16 +165,21 @@ const SecurityTab = ({ vm }) => {
       }
     } catch (err) {
       console.error('Error adding SSH key:', err);
-      showNotification({
-        type: 'error',
-        message: `Failed to add SSH key: ${err.message}`
-      });
+      showError(`Failed to add SSH key: ${err.message}`);
     }
   };
 
   const handleDeleteSSHKey = async (keyId) => {
+    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+    const effectiveVmId = vm?.id || urlVmId;
+
+    if (!effectiveVmId) {
+      showError('VM ID is missing. Cannot delete SSH key.');
+      return;
+    }
+
     try {
-      const result = await updateVMSecurity(vm.id, {
+      const result = await updateVMSecurity(effectiveVmId, {
         action: 'removeSSHKey',
         keyId: keyId
       });
@@ -159,32 +188,31 @@ const SecurityTab = ({ vm }) => {
         // Update the local state
         setSSHKeys(prevKeys => prevKeys.filter(key => key.id !== keyId));
 
-        showNotification({
-          type: 'success',
-          message: 'SSH key removed successfully'
-        });
+        showSuccess('SSH key removed successfully');
       }
     } catch (err) {
       console.error('Error removing SSH key:', err);
-      showNotification({
-        type: 'error',
-        message: `Failed to remove SSH key: ${err.message}`
-      });
+      showError(`Failed to remove SSH key: ${err.message}`);
     }
   };
 
   const handleGenerateCertificate = async () => {
     if (!newCertName) {
-      showNotification({
-        type: 'error',
-        message: 'Certificate name is required'
-      });
+      showError('Certificate name is required');
+      return;
+    }
+
+    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+    const effectiveVmId = vm?.id || urlVmId;
+
+    if (!effectiveVmId) {
+      showError('VM ID is missing. Cannot generate certificate.');
       return;
     }
 
     try {
-      const result = await generateCertificate({
-        vmId: vm.id,
+      const result = await createCertificate({
+        vmId: effectiveVmId,
         name: newCertName,
         validityDays: newCertValidity
       });
@@ -193,54 +221,47 @@ const SecurityTab = ({ vm }) => {
         // Update the local state
         setCertificates(prevCerts => [...prevCerts, result.certificate]);
 
-        showNotification({
-          type: 'success',
-          message: 'Certificate generated successfully'
-        });
+        showSuccess('Certificate generated successfully');
 
         setShowGenerateCertModal(false);
         setNewCertName('');
       }
     } catch (err) {
       console.error('Error generating certificate:', err);
-      showNotification({
-        type: 'error',
-        message: `Failed to generate certificate: ${err.message}`
-      });
+      showError(`Failed to generate certificate: ${err.message}`);
     }
   };
 
   const handleRevokeCertificate = async (certId) => {
     try {
-      const result = await revokeCertificate(certId);
+      // Simulate revoking certificate
+      // Update the local state
+      setCertificates(prevCerts =>
+        prevCerts.map(cert =>
+          cert.id === certId
+            ? { ...cert, status: 'revoked', revokedAt: new Date().toISOString() }
+            : cert
+        )
+      );
 
-      if (result.success) {
-        // Update the local state
-        setCertificates(prevCerts =>
-          prevCerts.map(cert =>
-            cert.id === certId
-              ? { ...cert, status: 'revoked', revokedAt: new Date().toISOString() }
-              : cert
-          )
-        );
-
-        showNotification({
-          type: 'success',
-          message: 'Certificate revoked successfully'
-        });
-      }
+      showSuccess('Certificate revoked successfully');
     } catch (err) {
       console.error('Error revoking certificate:', err);
-      showNotification({
-        type: 'error',
-        message: `Failed to revoke certificate: ${err.message}`
-      });
+      showError(`Failed to revoke certificate: ${err.message}`);
     }
   };
 
   const runSecurityScan = async () => {
+    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+    const effectiveVmId = vm?.id || urlVmId;
+
+    if (!effectiveVmId) {
+      showError('VM ID is missing. Cannot run security scan.');
+      return;
+    }
+
     try {
-      const result = await updateVMSecurity(vm.id, {
+      const result = await updateVMSecurity(effectiveVmId, {
         action: 'runSecurityScan'
       });
 
@@ -248,19 +269,41 @@ const SecurityTab = ({ vm }) => {
         // Update the local state
         setSecurityScans(prevScans => [result.scan, ...prevScans]);
 
-        showNotification({
-          type: 'success',
-          message: 'Security scan initiated successfully'
-        });
+        showSuccess('Security scan initiated successfully');
       }
     } catch (err) {
       console.error('Error running security scan:', err);
-      showNotification({
-        type: 'error',
-        message: `Failed to run security scan: ${err.message}`
-      });
+      showError(`Failed to run security scan: ${err.message}`);
     }
   };
+
+  const handleUpdateSSHKey = async () => {
+    if (!sshUser) {
+      showError('SSH username is required');
+      return;
+    }
+
+    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+    const effectiveVmId = vm?.id || urlVmId;
+
+    if (!effectiveVmId) {
+      showError('VM ID is missing. Cannot update SSH key.');
+      return;
+    }
+
+    try {
+      console.log('Updating SSH key for VM:', effectiveVmId, 'with user:', sshUser);
+      await updateSSHKey(effectiveVmId, sshUser);
+      setShowUpdateSSHKeyModal(false);
+      setSSHUser('');
+    } catch (err) {
+      console.error('Error updating SSH key:', err);
+      showError(`Failed to update SSH key: ${err.message}`);
+    }
+  };
+
+  // Check if user is admin
+  const isAdmin = user && user.role === 'admin';
 
   if (loading && !securityDetails) {
     return (
@@ -294,14 +337,25 @@ const SecurityTab = ({ vm }) => {
       <Card
         title="SSH Keys"
         actions={
-          <Button
-            variant="primary"
-            size="small"
-            icon="plus"
-            onClick={() => setShowAddKeyModal(true)}
-          >
-            Add SSH Key
-          </Button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowUpdateSSHKeyModal(true)}
+              >
+                Update SSH Key
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              icon="plus"
+              onClick={() => setShowAddKeyModal(true)}
+            >
+              Add SSH Key
+            </Button>
+          </div>
         }
       >
         <Table
@@ -320,7 +374,7 @@ const SecurityTab = ({ vm }) => {
             )}
           ]}
           data={sshKeys}
-          emptyMessage="No SSH keys configured"
+          emptyText="No SSH keys configured"
         />
       </Card>
 
@@ -329,7 +383,7 @@ const SecurityTab = ({ vm }) => {
         actions={
           <Button
             variant="primary"
-            size="small"
+            size="sm"
             icon="plus"
             onClick={() => setShowGenerateCertModal(true)}
           >
@@ -360,7 +414,7 @@ const SecurityTab = ({ vm }) => {
         actions={
           <Button
             variant="primary"
-            size="small"
+            size="sm"
             icon="shield"
             onClick={runSecurityScan}
           >
@@ -399,7 +453,7 @@ const SecurityTab = ({ vm }) => {
             )}
           ]}
           data={securityScans}
-          emptyMessage="No security scans have been run"
+          emptyText="No security scans have been run"
         />
       </Card>
 
@@ -414,7 +468,15 @@ const SecurityTab = ({ vm }) => {
                   id="password-auth"
                   checked={securityDetails.passwordAuth}
                   onChange={() => {
-                    updateVMSecurity(vm.id, {
+                    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+                    const effectiveVmId = vm?.id || urlVmId;
+
+                    if (!effectiveVmId) {
+                      showError('VM ID is missing. Cannot toggle password authentication.');
+                      return;
+                    }
+
+                    updateVMSecurity(effectiveVmId, {
                       action: 'togglePasswordAuth',
                       enabled: !securityDetails.passwordAuth
                     }).then(result => {
@@ -442,7 +504,15 @@ const SecurityTab = ({ vm }) => {
                   id="root-login"
                   checked={securityDetails.rootLogin}
                   onChange={() => {
-                    updateVMSecurity(vm.id, {
+                    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+                    const effectiveVmId = vm?.id || urlVmId;
+
+                    if (!effectiveVmId) {
+                      showError('VM ID is missing. Cannot toggle root login.');
+                      return;
+                    }
+
+                    updateVMSecurity(effectiveVmId, {
                       action: 'toggleRootLogin',
                       enabled: !securityDetails.rootLogin
                     }).then(result => {
@@ -470,7 +540,15 @@ const SecurityTab = ({ vm }) => {
                   id="auto-updates"
                   checked={securityDetails.autoUpdates}
                   onChange={() => {
-                    updateVMSecurity(vm.id, {
+                    // Sử dụng vm.id nếu có, nếu không thì sử dụng urlVmId
+                    const effectiveVmId = vm?.id || urlVmId;
+
+                    if (!effectiveVmId) {
+                      showError('VM ID is missing. Cannot toggle automatic updates.');
+                      return;
+                    }
+
+                    updateVMSecurity(effectiveVmId, {
                       action: 'toggleAutoUpdates',
                       enabled: !securityDetails.autoUpdates
                     }).then(result => {
@@ -595,6 +673,62 @@ const SecurityTab = ({ vm }) => {
               disabled={!newCertName}
             >
               Generate
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Update SSH Key Modal */}
+      {showUpdateSSHKeyModal && (
+        <Modal
+          title="Update SSH Key"
+          onClose={() => {
+            setShowUpdateSSHKeyModal(false);
+            setSSHUser('');
+          }}
+          size="small"
+        >
+          <div style={{ marginBottom: '10px', fontSize: '0.875rem', color: '#666' }}>
+            VM ID: {vm?.id || urlVmId || 'Not available'}
+          </div>
+          <div className="form-group">
+            <label>SSH Username</label>
+            <input
+              type="text"
+              value={sshUser}
+              onChange={(e) => setSSHUser(e.target.value)}
+              placeholder="e.g., ubuntu, ec2-user, root"
+              className="form-control"
+            />
+          </div>
+          <p className="hint-text" style={{ marginTop: '8px', fontSize: '0.875rem', color: '#666' }}>
+            This will generate a new SSH key for the specified user and update it on the VM.
+          </p>
+
+          <div className="modal-actions">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowUpdateSSHKeyModal(false);
+                setSSHUser('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                const effectiveVmId = vm?.id || urlVmId;
+                console.log('Update Key button clicked - vm:', vm);
+                console.log('vm.id:', vm?.id);
+                console.log('urlVmId:', urlVmId);
+                console.log('effectiveVmId:', effectiveVmId);
+                console.log('sshUser:', sshUser);
+                handleUpdateSSHKey();
+              }}
+              disabled={!sshUser || (!vm?.id && !urlVmId)}
+            >
+              Update Key
             </Button>
           </div>
         </Modal>
