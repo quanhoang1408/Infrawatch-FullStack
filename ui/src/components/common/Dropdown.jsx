@@ -1,7 +1,7 @@
 // Dropdown.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Dropdown.scss';
+import '../../styles/components/Dropdown.scss';
 import useOnClickOutside from '../../hooks/useOnClickOutside';
 
 /**
@@ -25,9 +25,9 @@ const Dropdown = ({
 }) => {
   const isControlled = controlledVisible !== undefined;
   const [uncontrolledVisible, setUncontrolledVisible] = useState(false);
-  
+
   const visible = isControlled ? controlledVisible : uncontrolledVisible;
-  
+
   const containerRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -102,7 +102,7 @@ Dropdown.Item = function DropdownItem({ children, onClick, className = '', disab
 
 Dropdown.Divider = function DropdownDivider({ className = '', ...rest }) {
   const classes = ['iw-dropdown-divider', className].filter(Boolean).join(' ');
-  
+
   return <div className={classes} {...rest} />;
 };
 

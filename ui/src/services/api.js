@@ -26,7 +26,7 @@ const api = axios.create({
   },
   // Add CORS settings
   withCredentials: false,
-  timeout: 10000, // 10 seconds timeout
+  timeout: 30000, // 30 seconds timeout
 });
 
 // Log all requests in development

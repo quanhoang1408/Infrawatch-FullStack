@@ -1,7 +1,7 @@
 // Modal.jsx
 import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Modal.scss';
+import '../../styles/components/Modal.scss';
 import Button from './Button';
 
 /**

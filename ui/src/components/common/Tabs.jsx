@@ -1,7 +1,7 @@
 // Tabs.jsx
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Tabs.scss';
+import '../../styles/components/Tabs.scss';
 
 /**
  * Tabs component for organizing content into multiple views
@@ -24,9 +24,9 @@ const Tabs = ({
   const [uncontrolledActiveKey, setUncontrolledActiveKey] = useState(
     defaultActiveKey || (items[0] && items[0].key)
   );
-  
+
   const activeKey = isControlled ? controlledActiveKey : uncontrolledActiveKey;
-  
+
   const baseClass = 'iw-tabs';
   const classes = [
     baseClass,

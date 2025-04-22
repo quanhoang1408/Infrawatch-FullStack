@@ -1,7 +1,7 @@
 // Notification.jsx
 import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Notification.scss';
+import '../../styles/components/Notification.scss';
 
 /**
  * Notification component for displaying temporary messages
@@ -33,14 +33,14 @@ const Notification = ({
       const timer = setTimeout(() => {
         onClose?.();
       }, duration);
-      
+
       return () => clearTimeout(timer);
     }
   }, [duration, onClose]);
 
   const renderIcon = () => {
     const iconClass = `${baseClass}__icon ${baseClass}__icon--${type}`;
-    
+
     return <div className={iconClass}></div>;
   };
 

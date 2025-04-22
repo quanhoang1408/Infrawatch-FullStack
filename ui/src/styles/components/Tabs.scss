@@ -1,0 +1,77 @@
+// Tabs.scss
+.iw-tabs {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  
+  &__nav {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 16px;
+    overflow-x: auto;
+    
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background: var(--bg-color-secondary);
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 2px;
+    }
+  }
+  
+  &__tab {
+    padding: 12px 16px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+    white-space: nowrap;
+    position: relative;
+    
+    &:hover {
+      color: var(--color-primary);
+    }
+    
+    &--active {
+      color: var(--color-primary);
+      
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: var(--color-primary);
+      }
+    }
+    
+    &--disabled {
+      color: var(--text-color-disabled);
+      cursor: not-allowed;
+      
+      &:hover {
+        color: var(--text-color-disabled);
+      }
+    }
+  }
+  
+  &__content {
+    flex: 1;
+  }
+  
+  &__pane {
+    display: none;
+    
+    &--active {
+      display: block;
+    }
+  }
+}

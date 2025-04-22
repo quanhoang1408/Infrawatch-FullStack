@@ -1,0 +1,96 @@
+// Tooltip.scss
+.iw-tooltip {
+  position: relative;
+  display: inline-block;
+  
+  &__content {
+    position: absolute;
+    z-index: 1070;
+    display: block;
+    max-width: 250px;
+    padding: 8px 12px;
+    color: #fff;
+    text-align: center;
+    background-color: rgba(0, 0, 0, 0.75);
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    
+    &--visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    &--top {
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      
+      &::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: rgba(0, 0, 0, 0.75) transparent transparent transparent;
+      }
+    }
+    
+    &--bottom {
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: transparent transparent rgba(0, 0, 0, 0.75) transparent;
+      }
+    }
+    
+    &--left {
+      right: 100%;
+      top: 50%;
+      transform: translateY(-50%) translateX(-8px);
+      
+      &::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 100%;
+        margin-top: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: transparent transparent transparent rgba(0, 0, 0, 0.75);
+      }
+    }
+    
+    &--right {
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%) translateX(8px);
+      
+      &::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        right: 100%;
+        margin-top: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: transparent rgba(0, 0, 0, 0.75) transparent transparent;
+      }
+    }
+  }
+}

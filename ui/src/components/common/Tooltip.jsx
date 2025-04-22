@@ -1,7 +1,7 @@
 // Tooltip.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Tooltip.scss';
+import '../../styles/components/Tooltip.scss';
 
 /**
  * Tooltip component for displaying additional information
@@ -57,9 +57,9 @@ const Tooltip = ({
     if (visible && triggerRef.current && tooltipRef.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const tooltipRect = tooltipRef.current.getBoundingClientRect();
-      
+
       let top, left;
-      
+
       switch (placement) {
         case 'top':
           top = triggerRect.top - tooltipRect.height - 8;
@@ -81,18 +81,18 @@ const Tooltip = ({
           top = triggerRect.top - tooltipRect.height - 8;
           left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
       }
-      
+
       // Adjust position to stay within viewport
       if (left < 0) left = 0;
       if (left + tooltipRect.width > window.innerWidth) {
         left = window.innerWidth - tooltipRect.width;
       }
-      
+
       if (top < 0) top = 0;
       if (top + tooltipRect.height > window.innerHeight) {
         top = window.innerHeight - tooltipRect.height;
       }
-      
+
       tooltipRef.current.style.top = `${top}px`;
       tooltipRef.current.style.left = `${left}px`;
     }

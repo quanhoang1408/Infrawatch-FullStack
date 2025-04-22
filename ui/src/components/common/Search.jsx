@@ -1,7 +1,7 @@
 // Search.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import '../styles/components/Search.scss';
+import '../../styles/components/Search.scss';
 import useDebounce from '../../hooks/useDebounce';
 
 /**

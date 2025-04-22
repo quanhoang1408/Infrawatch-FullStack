@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Button, Form, Input, Select, Alert, Spin, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
+import axios from 'axios';
 import { Terminal as TerminalComponent } from '../../components/terminal';
-import { useNotification } from '../../hooks/useNotification';
+import useNotification from '../../hooks/useNotification';
 import { useVM } from '../../hooks/useVM';
 import api from '../../services/api';
+import { initiateSSHConnection } from '../../services/terminal.service';
 import './Terminal.scss';
 
 const { Title } = Typography;
@@ -15,10 +17,12 @@ const { Option } = Select;
  * Terminal page for SSH connection to VMs
  */
 const Terminal = () => {
-  const { id: vmId } = useParams();
+  const { vmId } = useParams();
+  console.log('Terminal page - vmId from URL params:', vmId);
   const navigate = useNavigate();
   const { showError, showSuccess } = useNotification();
-  const { getVM } = useVM();
+  const { getVMDetail, fetchVMById } = useVM();
+  console.log('Terminal - useVM hook loaded:', { getVMDetail, fetchVMById });
 
   const [vm, setVM] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -32,35 +36,98 @@ const Terminal = () => {
   useEffect(() => {
     const fetchVM = async () => {
       try {
-        const vmData = await getVM(vmId);
-        setVM(vmData);
-        setLoading(false);
+        console.log('Fetching VM details for ID:', vmId);
+
+        // No mock data - using real API only
+
+        // Try fetchVMById first, then fallback to getVMDetail
+        try {
+          console.log('Trying fetchVMById...');
+          const vmData = await fetchVMById(vmId);
+          console.log('VM data received from fetchVMById:', vmData);
+          setVM(vmData);
+          setLoading(false);
+        } catch (fetchError) {
+          console.log('fetchVMById failed, trying getVMDetail...', fetchError);
+          const vmData = await getVMDetail(vmId);
+          console.log('VM data received from getVMDetail:', vmData);
+          setVM(vmData);
+          setLoading(false);
+        }
       } catch (error) {
-        setError('Failed to load VM details');
-        setLoading(false);
-        showError('Error', 'Failed to load VM details');
+        console.error('Error fetching VM details:', error);
+
+        // Specific handling for timeout errors
+        if (error.code === 'ECONNABORTED') {
+          const timeoutMessage = 'Kết nối đến máy chủ bị timeout. Vui lòng thử lại sau.';
+          setError(timeoutMessage);
+          setLoading(false);
+          showError('Lỗi kết nối', timeoutMessage);
+        } else {
+          const errorMessage = error.message || 'Failed to load VM details';
+          setError(errorMessage);
+          setLoading(false);
+          showError('Error', errorMessage);
+        }
       }
     };
 
     fetchVM();
-  }, [vmId, getVM, showError]);
+  }, [vmId, fetchVMById, getVMDetail, showError]);
 
   // Handle form submission
   const handleConnect = async () => {
     setConnecting(true);
     setError(null);
 
-    try {
-      // Initiate SSH session
-      const response = await api.post(`/terminal/${vmId}/session`, { sshUser });
+    console.log('Initiating SSH session for VM:', vmId, 'with user:', sshUser);
 
-      setSessionId(response.data.sessionId);
+    try {
+      // Use the terminal service to initiate SSH session
+      console.log('Using terminal service to initiate SSH session');
+
+      const sessionInfo = await initiateSSHConnection(vmId, sshUser);
+      console.log('SSH session initiated successfully:', sessionInfo);
+
+      setSessionId(sessionInfo.sessionId);
       setShowForm(false);
       setConnecting(false);
+      showSuccess('SSH session initiated successfully');
     } catch (error) {
-      setError(error.response?.data?.message || 'Failed to connect to VM');
-      setConnecting(false);
-      showError('Connection Error', error.response?.data?.message || 'Failed to connect to VM');
+      console.error('SSH session initiation error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      // Specific handling for timeout errors
+      if (error.code === 'ECONNABORTED') {
+        const timeoutMessage = 'Kết nối đến máy chủ bị timeout. Vui lòng thử lại sau.';
+        setError(timeoutMessage);
+        setConnecting(false);
+        showError('Lỗi kết nối', timeoutMessage);
+      } else if (error.response?.status === 404) {
+        const errorMsg = 'VM not found or SSH service not available';
+        setError(errorMsg);
+        setConnecting(false);
+        showError('Connection Error', errorMsg);
+      } else if (error.response?.status === 401 || error.response?.status === 403) {
+        const errorMsg = 'Authentication failed. Please log in again.';
+        setError(errorMsg);
+        setConnecting(false);
+        showError('Authentication Error', errorMsg);
+      } else if (error.response?.status === 500) {
+        const errorMsg = 'Server error. The SSH service might be unavailable.';
+        setError(errorMsg);
+        setConnecting(false);
+        showError('Server Error', errorMsg);
+      } else {
+        const errorMsg = error.response?.data?.message || 'Failed to connect to VM';
+        setError(errorMsg);
+        setConnecting(false);
+        showError('Connection Error', errorMsg);
+      }
     }
   };
 
@@ -68,8 +135,32 @@ const Terminal = () => {
   const handleTerminalConnect = (vmId, sessionId) => {
     if (!sessionId) return null;
 
-    // Return WebSocket URL with session ID in protocol
-    return `wss://${window.location.hostname === 'localhost' ? 'api.infrawatch.website' : window.location.host}/ws-ssh`;
+    // Use the WebSocket URL returned from the API
+    // If sessionId starts with 'mock-', it's a mock session for testing
+    if (sessionId.startsWith('mock-')) {
+      // For mock sessions, use a direct WebSocket URL
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.hostname === 'localhost' ? 'api.infrawatch.website' : window.location.host;
+      const wsUrl = `${wsProtocol}//${wsHost}/ws-ssh`;
+
+      console.log('Using mock WebSocket URL:', wsUrl);
+      return wsUrl;
+    }
+
+    // For real sessions, use the WebSocket URL from the session info
+    // The API returns a complete WebSocket URL
+    const wsUrl = `wss://api.infrawatch.website/ws-ssh`;
+
+    // Log connection attempt for debugging
+    console.log('Attempting to connect to WebSocket with:', {
+      vmId,
+      sessionId,
+      hostname: window.location.hostname,
+      wsUrl: wsUrl
+    });
+
+    // Return WebSocket URL
+    return wsUrl;
   };
 
   // Handle terminal disconnection
@@ -91,7 +182,8 @@ const Terminal = () => {
 
   // Handle back button click
   const handleBack = () => {
-    navigate(`/vms/${vmId}`);
+    console.log('Navigating back to VM details for VM:', vmId);
+    navigate(`/vm/${vmId}`);
   };
 
   if (loading) {
@@ -109,16 +201,51 @@ const Terminal = () => {
         <Alert
           type="error"
           message="VM Not Found"
-          description="The requested VM could not be found. Please check the VM ID and try again."
+          description={error || "The requested VM could not be found. Please check the VM ID and try again."}
           showIcon
         />
-        <Button
-          type="primary"
-          onClick={() => navigate('/vms')}
-          style={{ marginTop: '16px' }}
-        >
-          Back to VM List
-        </Button>
+        <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+          <Button
+            type="primary"
+            onClick={() => navigate('/vm')}
+          >
+            Back to VM List
+          </Button>
+          <Button
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              // Create a new instance of Axios with longer timeout just for this retry
+              const retryApi = axios.create({
+                baseURL: process.env.REACT_APP_API_URL,
+                timeout: 60000, // 60 seconds timeout for retry
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                }
+              });
+
+              // Try to fetch VM details with longer timeout
+              retryApi.get(`/vm/${vmId}`)
+                .then(response => {
+                  console.log('Retry successful:', response.data);
+                  setVM(response.data);
+                  setLoading(false);
+                })
+                .catch(error => {
+                  console.error('Retry failed:', error);
+                  const errorMessage = error.code === 'ECONNABORTED'
+                    ? 'Kết nối vẫn bị timeout. Vui lòng kiểm tra kết nối mạng hoặc liên hệ với quản trị viên.'
+                    : (error.message || 'Failed to load VM details');
+                  setError(errorMessage);
+                  setLoading(false);
+                  showError('Lỗi kết nối', errorMessage);
+                });
+            }}
+          >
+            Thử lại (60s timeout)
+          </Button>
+        </div>
       </div>
     );
   }
@@ -173,6 +300,28 @@ const Terminal = () => {
                 block
               >
                 {connecting ? 'Connecting...' : 'Connect'}
+              </Button>
+            </Form.Item>
+
+            <Form.Item>
+              <Button
+                onClick={async () => {
+                  try {
+                    setConnecting(true);
+                    // Test API connection
+                    const response = await api.get('/auth/me');
+                    console.log('API connection test successful:', response.data);
+                    showSuccess('API connection test successful');
+                    setConnecting(false);
+                  } catch (error) {
+                    console.error('API connection test failed:', error);
+                    showError('API Connection Test', 'Failed to connect to API: ' + (error.message || 'Unknown error'));
+                    setConnecting(false);
+                  }
+                }}
+                block
+              >
+                Test API Connection
               </Button>
             </Form.Item>
           </Form>

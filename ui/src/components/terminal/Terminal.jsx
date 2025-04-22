@@ -202,7 +202,18 @@ const Terminal = ({
       }
 
       // Create WebSocket connection with session ID in protocol
-      websocketRef.current = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
+      console.log('Creating WebSocket connection to:', wsUrl, 'with protocol:', [`sessionId.${sessionId}`]);
+
+      // Real WebSocket connection
+      try {
+        websocketRef.current = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
+        console.log('WebSocket object created successfully');
+      } catch (wsError) {
+        console.error('Error creating WebSocket:', wsError);
+        setError(`Failed to create WebSocket connection: ${wsError.message}`);
+        setConnecting(false);
+        return;
+      }
 
       // Handle WebSocket events
       websocketRef.current.onopen = () => {
@@ -220,18 +231,25 @@ const Terminal = ({
 
       websocketRef.current.onmessage = (event) => {
         try {
+          console.log('WebSocket message received:', typeof event.data, event.data.length);
+
           // Try to parse as JSON first
           try {
             const data = JSON.parse(event.data);
+            console.log('Parsed JSON data:', data);
 
             if (data.type === 'data') {
               xtermRef.current.write(data.data);
+            } else if (data.error) {
+              console.error('Server reported error:', data.error);
+              xtermRef.current.writeln(`\r\nServer error: ${data.error}`);
             }
 
             // Call onData handler
             onData?.(data);
           } catch (e) {
             // If not JSON, treat as raw text
+            console.log('Treating message as raw text');
             xtermRef.current.write(event.data);
           }
         } catch (error) {
@@ -240,16 +258,41 @@ const Terminal = ({
       };
 
       websocketRef.current.onerror = (event) => {
-        setError('Connection error: Could not establish WebSocket connection');
+        console.error('WebSocket error:', event);
+        setError('Connection error: Could not establish WebSocket connection. Please check your network and server status.');
         setConnected(false);
         setConnecting(false);
-        console.error('WebSocket error:', event);
+
+        // Display error in terminal
+        xtermRef.current.writeln('\r\n\x1b[31mConnection error: Could not establish WebSocket connection.\x1b[0m');
+        xtermRef.current.writeln('\r\nPossible reasons:');
+        xtermRef.current.writeln('1. The server is not running or unreachable');
+        xtermRef.current.writeln('2. WebSocket endpoint is not properly configured');
+        xtermRef.current.writeln('3. Network issues or firewall blocking WebSocket connections');
+        xtermRef.current.writeln('\r\nPlease check the browser console for more details.');
       };
 
       websocketRef.current.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason);
         setConnected(false);
+
         const reason = event.reason || 'Connection closed';
-        xtermRef.current.writeln(`\r\n${reason}`);
+        const code = event.code;
+
+        // Display close reason with color based on code
+        if (code === 1000) {
+          // Normal closure
+          xtermRef.current.writeln(`\r\n\x1b[33mConnection closed: ${reason}\x1b[0m`);
+        } else if (code === 1006) {
+          // Abnormal closure
+          xtermRef.current.writeln(`\r\n\x1b[31mConnection closed unexpectedly (code: ${code})\x1b[0m`);
+          xtermRef.current.writeln('The connection was closed without a proper WebSocket close handshake.');
+          xtermRef.current.writeln('This may indicate network issues or server problems.');
+        } else {
+          // Other closure
+          xtermRef.current.writeln(`\r\n\x1b[31mConnection closed (code: ${code}): ${reason}\x1b[0m`);
+        }
+
         onDisconnect?.(vmId, sessionId, reason);
       };
     } catch (error) {

@@ -16,7 +16,7 @@ class SSHSessionService {
   }
 
   generateKeyPair() {
-    // Use crypto to generate SSH key pair in OpenSSH format
+    // Use ssh2 utils to generate SSH key pair in OpenSSH format
     try {
       // First, generate a temporary key pair
       const tempKeyPair = generateKeyPairSync('rsa', {
@@ -30,16 +30,16 @@ class SSHSessionService {
           format: 'pem'
         }
       });
-
+      
       // Convert the public key to OpenSSH format
       // This is a workaround since Vault expects OpenSSH format
       const publicKey = tempKeyPair.publicKey.replace(/^-----BEGIN PUBLIC KEY-----\n/, '')
         .replace(/\n-----END PUBLIC KEY-----\n?$/, '')
         .replace(/\n/g, '');
-
+      
       // Create a proper SSH public key format
       const sshPublicKey = `ssh-rsa ${publicKey} web-ssh-key`;
-
+      
       return {
         publicKey: sshPublicKey,
         privateKey: tempKeyPair.privateKey

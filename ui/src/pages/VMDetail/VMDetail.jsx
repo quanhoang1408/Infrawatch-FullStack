@@ -74,14 +74,17 @@ const VMDetailHeader = ({ vm, onAction, onTerminal }) => (
           Start
         </Button>
       )}
+      {/* Always show Terminal SSH button */}
+      <Button
+        variant="primary"
+        onClick={onTerminal}
+      >
+        Terminal SSH
+      </Button>
+
+      {/* Other buttons only when VM is running */}
       {vm.status === 'running' && (
         <>
-          <Button
-            variant="primary"
-            onClick={onTerminal}
-          >
-            Terminal SSH
-          </Button>
           <Button
             variant="warning"
             onClick={() => onAction('restart')}
@@ -221,7 +224,8 @@ const VMDetail = () => {
   };
 
   const handleTerminal = () => {
-    navigate(`/vms/${vmId}/terminal`);
+    console.log('Navigating to terminal for VM:', vmId);
+    navigate(`/vm/${vmId}/terminal`);
   };
 
   const handleActionConfirm = async () => {

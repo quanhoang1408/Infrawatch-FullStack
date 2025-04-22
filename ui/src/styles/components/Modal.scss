@@ -1,0 +1,86 @@
+// Modal.scss
+.iw-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &__backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+  }
+  
+  &__content {
+    position: relative;
+    background-color: var(--bg-color-panel);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-width: 90%;
+    max-height: 90%;
+    overflow: auto;
+    
+    &--sm {
+      width: 400px;
+    }
+    
+    &--md {
+      width: 600px;
+    }
+    
+    &--lg {
+      width: 800px;
+    }
+    
+    &--xl {
+      width: 1000px;
+    }
+  }
+  
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  &__title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    color: var(--text-color-secondary);
+    
+    &:hover {
+      color: var(--text-color-primary);
+    }
+  }
+  
+  &__body {
+    padding: 16px;
+  }
+  
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+    gap: 8px;
+  }
+}

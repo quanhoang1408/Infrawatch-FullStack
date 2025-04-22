@@ -14,7 +14,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import VMList from './pages/VMList';
-import VMDetail from './pages/VMDetail';
+import VMDetail from './pages/VMDetail/VMDetail';
+import Terminal from './pages/Terminal';
 import Providers from './pages/Admin/Providers';
 import NotFound from './pages/NotFound';
 
@@ -39,6 +40,7 @@ const App = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/vm" element={<VMList />} />
                   <Route path="/vm/:vmId" element={<VMDetail />} />
+                  <Route path="/vm/:vmId/terminal" element={<Terminal />} />
 
                   {/* Admin routes */}
                   <Route element={<AdminRoute />}>
@@ -50,8 +52,11 @@ const App = () => {
                 </Route>
               </Route>
 
-              {/* Redirect root to dashboard */}
+              {/* Redirects */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+              {/* Support for old URL format */}
+              <Route path="/vms/:vmId/terminal" element={<Terminal />} />
 
               {/* Not found route */}
               <Route path="*" element={<NotFound />} />
