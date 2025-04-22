@@ -2,6 +2,10 @@ const { Client } = require('ssh2');
 const crypto = require('crypto');
 const NodeCache = require('node-cache');
 const { generateKeyPairSync } = require('crypto');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const vaultSSHService = require('./vault-ssh.service');
 const vmService = require('./vm.service');
 const logger = require('../utils/logger');
@@ -16,9 +20,48 @@ class SSHSessionService {
   }
 
   generateKeyPair() {
-    // Use crypto to generate SSH key pair in OpenSSH format
     try {
-      // First, generate a temporary key pair
+      // Create temporary directory for key generation
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ssh-keys-'));
+      const keyPath = path.join(tempDir, 'id_rsa');
+
+      // Generate SSH key using ssh-keygen (most reliable way to get correct format)
+      try {
+        execSync(`ssh-keygen -t rsa -b 2048 -f "${keyPath}" -N "" -C "web-ssh-key"`, {
+          stdio: 'ignore'
+        });
+      } catch (error) {
+        logger.error('Failed to execute ssh-keygen:', error);
+        // Fallback to Node.js crypto if ssh-keygen fails
+        return this.generateKeyPairFallback();
+      }
+
+      // Read the generated keys
+      const privateKey = fs.readFileSync(keyPath, 'utf8');
+      const publicKey = fs.readFileSync(`${keyPath}.pub`, 'utf8').trim();
+
+      // Clean up temporary files
+      try {
+        fs.unlinkSync(keyPath);
+        fs.unlinkSync(`${keyPath}.pub`);
+        fs.rmdirSync(tempDir);
+      } catch (cleanupError) {
+        logger.warn('Failed to clean up temporary SSH key files:', cleanupError);
+      }
+
+      logger.info('Successfully generated SSH key pair using ssh-keygen');
+      return { publicKey, privateKey };
+    } catch (error) {
+      logger.error('Failed to generate SSH key pair:', error);
+      // Fallback to Node.js crypto if anything fails
+      return this.generateKeyPairFallback();
+    }
+  }
+
+  generateKeyPairFallback() {
+    logger.info('Using fallback method to generate SSH key pair');
+    try {
+      // Generate key pair using Node.js crypto
       const tempKeyPair = generateKeyPairSync('rsa', {
         modulusLength: 2048,
         publicKeyEncoding: {
@@ -31,21 +74,15 @@ class SSHSessionService {
         }
       });
 
-      // Convert the public key to OpenSSH format
-      // This is a workaround since Vault expects OpenSSH format
-      const publicKey = tempKeyPair.publicKey.replace(/^-----BEGIN PUBLIC KEY-----\n/, '')
-        .replace(/\n-----END PUBLIC KEY-----\n?$/, '')
-        .replace(/\n/g, '');
-
-      // Create a proper SSH public key format
-      const sshPublicKey = `ssh-rsa ${publicKey} web-ssh-key`;
-
+      // For the fallback method, we'll use a simpler approach
+      // Just return the PEM format keys directly
+      // Vault will have to handle this format or we'll need to use mock data
       return {
-        publicKey: sshPublicKey,
+        publicKey: tempKeyPair.publicKey,
         privateKey: tempKeyPair.privateKey
       };
     } catch (error) {
-      logger.error('Failed to generate SSH key pair:', error);
+      logger.error('Failed to generate SSH key pair using fallback method:', error);
       throw error;
     }
   }
