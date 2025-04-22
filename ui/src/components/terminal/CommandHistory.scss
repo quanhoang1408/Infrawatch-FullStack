@@ -1,0 +1,88 @@
+// CommandHistory.scss
+.iw-command-history {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 10;
+  
+  &__toggle {
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 4px 8px;
+    
+    i {
+      margin-left: 4px;
+    }
+  }
+  
+  &__panel {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    width: 300px;
+    max-height: 300px;
+    background-color: var(--bg-color-panel);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  
+  &__panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  &__panel-title {
+    font-weight: 500;
+    font-size: 14px;
+  }
+  
+  &__commands {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 250px;
+  }
+  
+  &__empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-color-tertiary);
+    font-style: italic;
+  }
+  
+  &__command-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  &__command-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color-light);
+    
+    &:hover {
+      background-color: var(--bg-color-hover);
+    }
+    
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+  
+  &__command-text {
+    font-family: monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+  }
+}

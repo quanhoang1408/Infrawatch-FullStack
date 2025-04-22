@@ -66,7 +66,7 @@ const InfoTab = ({ vm, onAction }) => {
           disabled={!isRunning}
           icon="terminal"
           variant="secondary"
-          href={`/terminal/${vm.id}`}
+          href={`/vms/${vm.id}/terminal`}
         >
           SSH Terminal
         </Button>

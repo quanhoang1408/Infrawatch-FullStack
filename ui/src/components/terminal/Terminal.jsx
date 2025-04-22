@@ -5,12 +5,12 @@ import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import { SearchAddon } from 'xterm-addon-search';
+import 'xterm/css/xterm.css';
 import TerminalToolbar from './TerminalToolbar';
 import ConnectionStatus from './ConnectionStatus';
 import CommandHistory from './CommandHistory';
 import TerminalContextMenu from './TerminalContextMenu';
 import './Terminal.scss';
-import 'xterm/css/xterm.css';
 
 /**
  * SSH Terminal component for connecting to VMs
@@ -113,8 +113,9 @@ const Terminal = ({
     // Handle terminal data (keystrokes)
     xtermRef.current.onData(data => {
       if (connected && websocketRef.current) {
-        websocketRef.current.send(JSON.stringify({ type: 'data', data }));
-        
+        // Send data directly without JSON wrapping
+        websocketRef.current.send(data);
+
         // Track command for history
         if (data === '\r') {
           if (currentCommand.trim()) {
@@ -131,13 +132,8 @@ const Terminal = ({
 
     // Handle terminal resize
     xtermRef.current.onResize(({ cols, rows }) => {
-      if (connected && websocketRef.current) {
-        websocketRef.current.send(JSON.stringify({ 
-          type: 'resize', 
-          cols, 
-          rows 
-        }));
-      }
+      // Resize events are handled by the server automatically
+      // No need to send resize events
     });
 
     // Create resize observer
@@ -161,11 +157,11 @@ const Terminal = ({
       if (websocketRef.current) {
         websocketRef.current.close();
       }
-      
+
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
       }
-      
+
       if (xtermRef.current) {
         xtermRef.current.dispose();
       }
@@ -181,7 +177,7 @@ const Terminal = ({
       xtermRef.current.options.cursorBlink = terminalSettings.cursorBlink;
       xtermRef.current.options.cursorStyle = terminalSettings.cursorStyle;
       xtermRef.current.options.theme = terminalSettings.theme;
-      
+
       if (fitAddonRef.current) {
         fitAddonRef.current.fit();
       }
@@ -191,77 +187,87 @@ const Terminal = ({
   // Handle terminal connection
   const handleConnect = () => {
     if (connecting || connected) return;
-    
+
     setConnecting(true);
     setError(null);
-    
+
     try {
       // Call connect handler and get WebSocket URL
       const wsUrl = onConnect?.(vmId, sessionId);
-      
+
       if (!wsUrl) {
-        throw new Error('No WebSocket URL provided');
+        setConnecting(false);
+        setError('No WebSocket URL provided. Please check your session.');
+        return;
       }
-      
-      // Create WebSocket connection
-      websocketRef.current = new WebSocket(wsUrl);
-      
+
+      // Create WebSocket connection with session ID in protocol
+      websocketRef.current = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
+
       // Handle WebSocket events
       websocketRef.current.onopen = () => {
         setConnected(true);
         setConnecting(false);
-        
-        // Send initial terminal size
-        const { cols, rows } = xtermRef.current;
-        websocketRef.current.send(JSON.stringify({ 
-          type: 'resize', 
-          cols, 
-          rows 
-        }));
-        
+
+        // Terminal size is handled automatically by the server
+
         // Welcome message
         xtermRef.current.writeln('Connected to terminal session.');
         xtermRef.current.writeln(`VM: ${vmName} (${vmId})`);
         xtermRef.current.writeln('--------------------------------------------------');
         xtermRef.current.writeln('');
       };
-      
+
       websocketRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'data') {
-          xtermRef.current.write(data.data);
+        try {
+          // Try to parse as JSON first
+          try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'data') {
+              xtermRef.current.write(data.data);
+            }
+
+            // Call onData handler
+            onData?.(data);
+          } catch (e) {
+            // If not JSON, treat as raw text
+            xtermRef.current.write(event.data);
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
         }
-        
-        // Call onData handler
-        onData?.(data);
       };
-      
+
       websocketRef.current.onerror = (event) => {
-        setError('Connection error');
+        setError('Connection error: Could not establish WebSocket connection');
+        setConnected(false);
         setConnecting(false);
         console.error('WebSocket error:', event);
       };
-      
-      websocketRef.current.onclose = () => {
+
+      websocketRef.current.onclose = (event) => {
         setConnected(false);
-        xtermRef.current.writeln('\r\nConnection closed.');
-        onDisconnect?.(vmId, sessionId);
+        const reason = event.reason || 'Connection closed';
+        xtermRef.current.writeln(`\r\n${reason}`);
+        onDisconnect?.(vmId, sessionId, reason);
       };
     } catch (error) {
       setError(`Connection failed: ${error.message}`);
+      setConnected(false);
       setConnecting(false);
+      console.error('Terminal connection error:', error);
     }
   };
 
   // Handle terminal disconnection
   const handleDisconnect = () => {
     if (websocketRef.current) {
-      websocketRef.current.close();
+      websocketRef.current.close(1000, 'User disconnected');
     }
-    
+
     setConnected(false);
-    onDisconnect?.(vmId, sessionId);
+    onDisconnect?.(vmId, sessionId, 'User disconnected');
   };
 
   // Handle terminal reset
@@ -297,7 +303,7 @@ const Terminal = ({
   // Handle context menu item click
   const handleContextMenuAction = (action) => {
     setContextMenuVisible(false);
-    
+
     switch (action) {
       case 'copy':
         document.execCommand('copy');
@@ -305,7 +311,7 @@ const Terminal = ({
       case 'paste':
         navigator.clipboard.readText().then(text => {
           if (xtermRef.current && connected) {
-            websocketRef.current.send(JSON.stringify({ type: 'data', data: text }));
+            websocketRef.current.send(text);
           }
         });
         break;
@@ -323,7 +329,7 @@ const Terminal = ({
   // Apply command from history
   const handleCommandFromHistory = (command) => {
     if (connected && websocketRef.current) {
-      websocketRef.current.send(JSON.stringify({ type: 'data', data: command + '\r' }));
+      websocketRef.current.send(command + '\r');
     }
   };
 
@@ -349,31 +355,37 @@ const Terminal = ({
         onSettingsChange={handleSettingsChange}
         terminalSettings={terminalSettings}
       />
-      
+
       <div className={`${baseClass}__container`}>
-        <div 
-          className={`${baseClass}__terminal`} 
+        <div
+          className={`${baseClass}__terminal`}
           ref={terminalRef}
           onContextMenu={handleContextMenu}
         />
-        
+
         {error && (
           <div className={`${baseClass}__error`}>
             <i className="icon-alert-circle" />
             <span>{error}</span>
+            <button
+              className={`${baseClass}__error-button`}
+              onClick={handleDisconnect}
+            >
+              Reconnect
+            </button>
           </div>
         )}
-        
+
         <ConnectionStatus
           connected={connected}
           connecting={connecting}
         />
-        
+
         <CommandHistory
           commands={commandHistory}
           onSelect={handleCommandFromHistory}
         />
-        
+
         {contextMenuVisible && (
           <TerminalContextMenu
             position={contextMenuPosition}

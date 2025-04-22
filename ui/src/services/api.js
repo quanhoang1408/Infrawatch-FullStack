@@ -3,7 +3,7 @@ import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../util
 
 // Make sure the URL points to the correct backend server
 // Should be defined in .env files for different environments
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/v1';
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
 
 // Log the API URL in development
 if (process.env.NODE_ENV === 'development') {

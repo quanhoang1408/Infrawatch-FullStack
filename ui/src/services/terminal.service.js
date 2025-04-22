@@ -1,6 +1,17 @@
 import api from './api';
 
 /**
+ * Initiate SSH connection to a VM
+ * @param {string} vmId - VM ID
+ * @param {string} sshUser - SSH username
+ * @returns {Promise} - Session info with sessionId and websocketUrl
+ */
+export const initiateSSHConnection = async (vmId, sshUser = 'ubuntu') => {
+  const response = await api.post(`/terminal/${vmId}/session`, { sshUser });
+  return response.data;
+};
+
+/**
  * Get terminal session
  * Creates a new terminal session or returns an existing one
  * @param {string} vmId - VM ID

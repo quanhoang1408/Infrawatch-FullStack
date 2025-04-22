@@ -138,8 +138,8 @@ const monitoringService = {
         granularity: granularity || defaultGranularity
       };
 
-      // For development: Use mock data if API is not available
-      if (process.env.NODE_ENV === 'development') {
+      // For development: Use mock data if API is not available or mock data is enabled
+      if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_DATA === 'true') {
         try {
           const response = await api.get(`/monitoring/${vmId}`, { params });
           return formatMonitoringData(response.data);
@@ -149,12 +149,20 @@ const monitoringService = {
           return formatMonitoringData(mockData);
         }
       } else {
-        // Production code
+        // Production code or when mock data is disabled
         const response = await api.get(`/monitoring/${vmId}`, { params });
         return formatMonitoringData(response.data);
       }
     } catch (error) {
       console.error(`Get monitoring data error for ${vmId}:`, error);
+      // Use mock data in development mode if authentication fails
+      if (process.env.NODE_ENV === 'development' && error.response?.status === 401) {
+        console.warn('API getMonitoringData failed due to authentication, using mock data for development');
+        // Get timeRange from options or use default
+        const mockTimeRange = options.timeRange || '1h';
+        const mockData = generateMockMonitoringData(vmId, mockTimeRange);
+        return formatMonitoringData(mockData);
+      }
       throw error;
     }
   },
@@ -167,8 +175,8 @@ const monitoringService = {
    */
   getLatestMonitoringData: async (vmId) => {
     try {
-      // For development: Use mock data if API is not available
-      if (process.env.NODE_ENV === 'development') {
+      // For development: Use mock data if API is not available or mock data is enabled
+      if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_DATA === 'true') {
         try {
           const response = await api.get(`/monitoring/${vmId}/data`);
           return response.data;
@@ -189,12 +197,29 @@ const monitoringService = {
           };
         }
       } else {
-        // Production code
+        // Production code or when mock data is disabled
         const response = await api.get(`/monitoring/${vmId}/data`);
         return response.data;
       }
     } catch (error) {
       console.error(`Get latest monitoring data error for ${vmId}:`, error);
+      // Use mock data in development mode if authentication fails
+      if (process.env.NODE_ENV === 'development' && error.response?.status === 401) {
+        console.warn('API getLatestMonitoringData failed due to authentication, using mock data for development');
+
+        // Generate current usage data
+        const cpuUsage = Math.floor(Math.random() * 70) + 10; // 10-80%
+        const memoryUsage = Math.floor(Math.random() * 70) + 20; // 20-90%
+        const diskUsage = Math.floor(Math.random() * 40) + 30; // 30-70%
+        const networkUsage = Math.floor(Math.random() * 10 * 1024 * 1024); // 0-10 MB/s
+
+        return {
+          cpu: cpuUsage,
+          memory: memoryUsage,
+          disk: diskUsage,
+          network: networkUsage
+        };
+      }
       throw error;
     }
   }

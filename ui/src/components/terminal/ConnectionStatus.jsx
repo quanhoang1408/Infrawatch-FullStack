@@ -1,6 +1,7 @@
 // ConnectionStatus.jsx
 import React from 'react';
 import PropTypes from 'prop-types';
+import './ConnectionStatus.scss';
 
 /**
  * Component to display terminal connection status
@@ -24,14 +25,14 @@ const ConnectionStatus = ({
         statusClass: `${baseClass}__indicator--connecting`
       };
     }
-    
+
     if (connected) {
       return {
         text: 'Connected',
         statusClass: `${baseClass}__indicator--connected`
       };
     }
-    
+
     return {
       text: 'Disconnected',
       statusClass: `${baseClass}__indicator--disconnected`

@@ -4,17 +4,30 @@ const app = require('./app');
 const config = require('./config');
 const { initJobs } = require('./jobs');
 const { initializeVault } = require('./middleware/vault.middleware');
+const setupWSServer = require('./websocket/ssh-server');
+const logger = require('./utils/logger');
 
 let server;
 
 mongoose.connect(config.mongodb.url, config.mongodb.options).then(() => {
   console.log('Connected to MongoDB');
-  
+
   // Initialize jobs
   initJobs();
-  
+
+  // Initialize Vault
+  try {
+    initializeVault();
+  } catch (error) {
+    logger.error('Failed to initialize Vault:', error);
+  }
+
   server = app.listen(config.port, () => {
     console.log(`Server listening on port ${config.port}`);
+
+    // Setup WebSocket server for SSH
+    setupWSServer(server);
+    console.log('WebSocket server for SSH initialized');
   });
 });
 

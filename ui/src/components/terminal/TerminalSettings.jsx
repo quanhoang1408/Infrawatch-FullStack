@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from '../common';
+import './TerminalSettings.scss';
 
 /**
  * Terminal settings panel component
@@ -25,7 +26,7 @@ const TerminalSettings = ({
   // Handle input change
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     setLocalSettings(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -35,7 +36,7 @@ const TerminalSettings = ({
   // Handle font family change
   const handleFontFamilyChange = (e) => {
     const { value } = e.target;
-    
+
     setLocalSettings(prev => ({
       ...prev,
       fontFamily: value
@@ -45,7 +46,7 @@ const TerminalSettings = ({
   // Handle cursor style change
   const handleCursorStyleChange = (e) => {
     const { value } = e.target;
-    
+
     setLocalSettings(prev => ({
       ...prev,
       cursorStyle: value
@@ -88,7 +89,7 @@ const TerminalSettings = ({
         brightWhite: '#ffffff'
       }
     };
-    
+
     setLocalSettings(defaultSettings);
     onSettingsChange?.(defaultSettings);
   };
@@ -104,7 +105,7 @@ const TerminalSettings = ({
           onClick={onClose}
         />
       </div>
-      
+
       <div className={`${baseClass}__content`}>
         <div className={`${baseClass}__form-group`}>
           <label className={`${baseClass}__label`}>Font Size</label>
@@ -136,7 +137,7 @@ const TerminalSettings = ({
             </Button>
           </div>
         </div>
-        
+
         <div className={`${baseClass}__form-group`}>
           <label className={`${baseClass}__label`}>Font Family</label>
           <select
@@ -151,7 +152,7 @@ const TerminalSettings = ({
             <option value='"Fira Code", monospace'>Fira Code</option>
           </select>
         </div>
-        
+
         <div className={`${baseClass}__form-group`}>
           <label className={`${baseClass}__label`}>Line Height</label>
           <input
@@ -168,7 +169,7 @@ const TerminalSettings = ({
             {localSettings.lineHeight.toFixed(1)}
           </span>
         </div>
-        
+
         <div className={`${baseClass}__form-group`}>
           <label className={`${baseClass}__label`}>Cursor Style</label>
           <select
@@ -181,7 +182,7 @@ const TerminalSettings = ({
             <option value="bar">Bar</option>
           </select>
         </div>
-        
+
         <div className={`${baseClass}__form-group ${baseClass}__checkbox-group`}>
           <label className={`${baseClass}__checkbox-label`}>
             <input
@@ -194,7 +195,7 @@ const TerminalSettings = ({
           </label>
         </div>
       </div>
-      
+
       <div className={`${baseClass}__footer`}>
         <Button
           variant="secondary"

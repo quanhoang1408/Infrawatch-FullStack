@@ -15,6 +15,8 @@ const envVarsSchema = Joi.object()
     JWT_REFRESH_EXPIRATION_DAYS: Joi.number().default(30).description('JWT refresh token expiration in days'),
     ENCRYPTION_KEY: Joi.string().required().min(32).description('Encryption key for sensitive data'),
     ENCRYPTION_IV: Joi.string().required().length(16).description('Encryption IV for sensitive data'),
+    API_DOMAIN: Joi.string().description('API domain for WebSocket connections'),
+    LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'http', 'debug').default('info').description('Log level'),
   })
   .unknown();
 
@@ -27,6 +29,7 @@ if (error) {
 module.exports = {
   env: envVars.NODE_ENV,
   port: envVars.PORT,
+  apiDomain: envVars.API_DOMAIN || 'api.infrawatch.website',
   mongodb: {
     url: envVars.MONGODB_URI,
     options: {
@@ -42,5 +45,8 @@ module.exports = {
   encryption: {
     key: envVars.ENCRYPTION_KEY,
     iv: Buffer.from(envVars.ENCRYPTION_IV),
+  },
+  logs: {
+    level: envVars.LOG_LEVEL || 'info',
   },
 };

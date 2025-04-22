@@ -152,8 +152,9 @@ const vmService = {
       return response.data;
     } catch (error) {
       console.error('Get VMs error:', error);
-      // Use mock data in development mode if allowed
-      if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+      // Use mock data in development mode if allowed or if authentication fails
+      if (process.env.NODE_ENV === 'development' &&
+          (process.env.REACT_APP_USE_MOCK_DATA === 'true' || error.response?.status === 401)) {
         console.warn('API getVMs failed, using mock data for development');
         return mockVMs;
       }
@@ -173,8 +174,9 @@ const vmService = {
       return response.data;
     } catch (error) {
       console.error(`Get VM by ID error for ${id}:`, error);
-      // Use mock data in development mode if allowed
-      if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+      // Use mock data in development mode if allowed or if authentication fails
+      if (process.env.NODE_ENV === 'development' &&
+          (process.env.REACT_APP_USE_MOCK_DATA === 'true' || error.response?.status === 401)) {
         console.warn('API getVMById failed, using mock data for development');
         const vm = mockVMs.find(vm => vm.id === id);
         if (vm) return vm;
@@ -224,8 +226,9 @@ const vmService = {
       return response.data;
     } catch (error) {
       console.error(`Get VM monitoring error for ${id}:`, error);
-      // Only use mock data in development mode and if explicitly allowed
-      if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_MOCK_DATA === 'true') {
+      // Use mock data in development mode if allowed or if authentication fails
+      if (process.env.NODE_ENV === 'development' &&
+          (process.env.REACT_APP_USE_MOCK_DATA === 'true' || error.response?.status === 401)) {
         console.warn('API getVMMonitoring failed, using mock data for development');
         return generateMockMonitoringData(id);
       }

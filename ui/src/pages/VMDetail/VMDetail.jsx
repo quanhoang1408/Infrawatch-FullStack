@@ -42,7 +42,7 @@ const Tabs = ({ activeTab, onChange, tabs }) => (
 );
 
 // Temporary VMDetailHeader component
-const VMDetailHeader = ({ vm, onAction }) => (
+const VMDetailHeader = ({ vm, onAction, onTerminal }) => (
   <div style={{
     display: 'flex',
     justifyContent: 'space-between',
@@ -76,6 +76,12 @@ const VMDetailHeader = ({ vm, onAction }) => (
       )}
       {vm.status === 'running' && (
         <>
+          <Button
+            variant="primary"
+            onClick={onTerminal}
+          >
+            Terminal SSH
+          </Button>
           <Button
             variant="warning"
             onClick={() => onAction('restart')}
@@ -214,6 +220,10 @@ const VMDetail = () => {
     setShowConfirmModal(true);
   };
 
+  const handleTerminal = () => {
+    navigate(`/vms/${vmId}/terminal`);
+  };
+
   const handleActionConfirm = async () => {
     try {
       let result;
@@ -328,6 +338,7 @@ const VMDetail = () => {
       <VMDetailHeader
         vm={vm}
         onAction={handleActionClick}
+        onTerminal={handleTerminal}
       />
 
       <Tabs

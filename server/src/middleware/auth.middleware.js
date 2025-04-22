@@ -1,6 +1,6 @@
 // src/middleware/auth.middleware.js
 const jwt = require('jsonwebtoken');
-const { ApiError } = require('../utils/errors');
+const ApiError = require('../utils/ApiError');
 const config = require('../config');
 const User = require('../models/user.model');
 
@@ -12,7 +12,7 @@ const User = require('../models/user.model');
 const auth = (tokenSource = 'header') => async (req, res, next) => {
   try {
     let token;
-    
+
     if (tokenSource === 'query') {
       // Get token from query parameter
       token = req.query.token;
@@ -25,22 +25,22 @@ const auth = (tokenSource = 'header') => async (req, res, next) => {
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new ApiError(401, 'Bearer token is required');
       }
-      
+
       token = authHeader.substring(7);
     }
 
     // Verify token
     const decoded = jwt.verify(token, config.jwt.secret);
-    
+
     // Get user
     const user = await User.findById(decoded.sub);
     if (!user) {
       throw new ApiError(401, 'User not found');
     }
-    
+
     // Attach user to request
     req.user = user;
-    
+
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {

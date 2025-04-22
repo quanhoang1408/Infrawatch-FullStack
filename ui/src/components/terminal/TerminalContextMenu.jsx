@@ -1,6 +1,7 @@
 // TerminalContextMenu.jsx
 import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
+import './TerminalContextMenu.scss';
 
 /**
  * Context menu for terminal
@@ -17,7 +18,7 @@ const TerminalContextMenu = ({
 }) => {
   const baseClass = 'iw-terminal-context-menu';
   const classes = [baseClass, className].filter(Boolean).join(' ');
-  
+
   const menuRef = useRef(null);
 
   // Close menu when clicking outside
@@ -29,7 +30,7 @@ const TerminalContextMenu = ({
     };
 
     document.addEventListener('mousedown', handleClickOutside);
-    
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };

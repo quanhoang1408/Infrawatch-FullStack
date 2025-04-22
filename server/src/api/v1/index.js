@@ -7,6 +7,7 @@ const activityRoutes = require('./activities/activity.routes');
 const monitoringRoute = require('./monitoring/monitoring.routes');
 const eventsRoutes = require('./events/events.routes');
 const agentRoutes = require('./agent/agent.routes');
+const terminalRoutes = require('./terminal/terminal.routes');
 
 const router = express.Router();
 
@@ -17,5 +18,6 @@ router.use('/activities', activityRoutes);
 router.use('/monitoring', monitoringRoute);
 router.use('/events', eventsRoutes);
 router.use('/agent', agentRoutes);
+router.use('/terminal', terminalRoutes);
 
 module.exports = router;

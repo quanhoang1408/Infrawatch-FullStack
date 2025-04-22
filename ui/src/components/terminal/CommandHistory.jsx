@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from '../common';
+import './CommandHistory.scss';
 
 /**
  * Component to display command history
@@ -46,7 +47,7 @@ const CommandHistory = ({
       >
         Command History
       </Button>
-      
+
       {visible && (
         <div className={`${baseClass}__panel`}>
           <div className={`${baseClass}__panel-header`}>
@@ -58,7 +59,7 @@ const CommandHistory = ({
               onClick={() => setVisible(false)}
             />
           </div>
-          
+
           <div className={`${baseClass}__commands`}>
             {commands.length === 0 ? (
               <div className={`${baseClass}__empty`}>No commands in history</div>

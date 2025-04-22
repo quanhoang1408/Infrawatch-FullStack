@@ -25,9 +25,9 @@ app.use(compression());
 
 // Enable CORS with specific options
 app.use(cors({
-  origin: '*', // Allow all origins, or specify your frontend URL
+  origin: ['https://api.infrawatch.website', 'http://localhost:8000'], // Allow specific origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token', 'Sec-WebSocket-Protocol'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204

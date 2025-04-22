@@ -33,7 +33,7 @@ async function initializeVault() {
       },
       allowed_users: "*",
       default_user: "ubuntu",  // Changed to ubuntu for Ubuntu EC2 instances
-      ttl: "24h"
+      ttl: "5m"  // Short-lived certificate for web SSH
     });
 
     logger.info('Vault SSH secrets engine configured successfully');
