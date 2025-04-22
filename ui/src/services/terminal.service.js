@@ -7,8 +7,15 @@ import api from './api';
  * @returns {Promise} - Session info with sessionId and websocketUrl
  */
 export const initiateSSHConnection = async (vmId, sshUser = 'ubuntu') => {
-  const response = await api.post(`/terminal/${vmId}/session`, { sshUser });
-  return response.data;
+  try {
+    console.log(`Initiating SSH connection to VM ${vmId} with user ${sshUser}`);
+    const response = await api.post(`/terminal/${vmId}/session`, { sshUser });
+    console.log('SSH connection response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error initiating SSH connection:', error);
+    throw error;
+  }
 };
 
 /**

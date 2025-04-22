@@ -85,7 +85,13 @@ const Terminal = ({
 
   // Initialize terminal
   useEffect(() => {
-    // Create terminal instance
+    // Make sure the terminal element exists before initializing
+    if (!terminalRef.current) {
+      console.error('Terminal element reference is not available');
+      return;
+    }
+
+    // Create terminal instance with safe defaults
     xtermRef.current = new XTerm({
       fontSize: terminalSettings.fontSize,
       fontFamily: terminalSettings.fontFamily,
@@ -94,7 +100,9 @@ const Terminal = ({
       cursorStyle: terminalSettings.cursorStyle,
       theme: terminalSettings.theme,
       scrollback: 1000,
-      allowTransparency: true
+      allowTransparency: true,
+      cols: 80,  // Default columns
+      rows: 24   // Default rows
     });
 
     // Create and attach addons
@@ -107,8 +115,23 @@ const Terminal = ({
     xtermRef.current.loadAddon(webLinksAddon);
 
     // Open terminal
-    xtermRef.current.open(terminalRef.current);
-    fitAddonRef.current.fit();
+    try {
+      xtermRef.current.open(terminalRef.current);
+
+      // Wait a moment before fitting to ensure the terminal is fully rendered
+      setTimeout(() => {
+        if (fitAddonRef.current) {
+          try {
+            fitAddonRef.current.fit();
+          } catch (fitError) {
+            console.error('Error fitting terminal:', fitError);
+          }
+        }
+      }, 100);
+    } catch (openError) {
+      console.error('Error opening terminal:', openError);
+      setError('Failed to initialize terminal: ' + openError.message);
+    }
 
     // Handle terminal data (keystrokes)
     xtermRef.current.onData(data => {
@@ -136,15 +159,29 @@ const Terminal = ({
       // No need to send resize events
     });
 
-    // Create resize observer
-    resizeObserverRef.current = new ResizeObserver(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    });
+    // Create resize observer with error handling
+    try {
+      resizeObserverRef.current = new ResizeObserver(() => {
+        if (fitAddonRef.current && xtermRef.current) {
+          try {
+            // Make sure the terminal is visible before fitting
+            if (terminalRef.current && terminalRef.current.offsetWidth > 0 && terminalRef.current.offsetHeight > 0) {
+              fitAddonRef.current.fit();
+            }
+          } catch (fitError) {
+            console.error('Error in resize observer when fitting terminal:', fitError);
+          }
+        }
+      });
 
-    if (containerRef.current) {
-      resizeObserverRef.current.observe(containerRef.current);
+      // Observe the container if it exists
+      if (containerRef.current) {
+        resizeObserverRef.current.observe(containerRef.current);
+      } else {
+        console.warn('Terminal container reference is not available for ResizeObserver');
+      }
+    } catch (observerError) {
+      console.error('Failed to create ResizeObserver:', observerError);
     }
 
     // Auto connect
@@ -154,17 +191,39 @@ const Terminal = ({
 
     // Cleanup
     return () => {
-      if (websocketRef.current) {
-        websocketRef.current.close();
+      // Clean up WebSocket connection
+      try {
+        if (websocketRef.current) {
+          websocketRef.current.close();
+          websocketRef.current = null;
+        }
+      } catch (wsError) {
+        console.error('Error closing WebSocket during cleanup:', wsError);
       }
 
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.disconnect();
+      // Clean up ResizeObserver
+      try {
+        if (resizeObserverRef.current) {
+          resizeObserverRef.current.disconnect();
+          resizeObserverRef.current = null;
+        }
+      } catch (observerError) {
+        console.error('Error disconnecting ResizeObserver during cleanup:', observerError);
       }
 
-      if (xtermRef.current) {
-        xtermRef.current.dispose();
+      // Clean up terminal
+      try {
+        if (xtermRef.current) {
+          xtermRef.current.dispose();
+          xtermRef.current = null;
+        }
+      } catch (terminalError) {
+        console.error('Error disposing terminal during cleanup:', terminalError);
       }
+
+      // Clear other refs
+      fitAddonRef.current = null;
+      searchAddonRef.current = null;
     };
   }, []);
 

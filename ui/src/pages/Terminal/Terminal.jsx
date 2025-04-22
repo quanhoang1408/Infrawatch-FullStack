@@ -3,12 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Button, Form, Input, Select, Alert, Spin, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import axios from 'axios';
-import { Terminal as TerminalComponent } from '../../components/terminal';
+// Import the BasicTerminal component
+import BasicTerminal from '../../components/terminal/BasicTerminal';
 import useNotification from '../../hooks/useNotification';
 import { useVM } from '../../hooks/useVM';
 import api from '../../services/api';
 import { initiateSSHConnection } from '../../services/terminal.service';
 import './Terminal.scss';
+// Import the BasicTerminal styles
+import '../../components/terminal/BasicTerminal.scss';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -133,33 +136,35 @@ const Terminal = () => {
 
   // Handle terminal connection
   const handleTerminalConnect = (vmId, sessionId) => {
-    if (!sessionId) return null;
-
-    // Use the WebSocket URL returned from the API
-    // If sessionId starts with 'mock-', it's a mock session for testing
-    if (sessionId.startsWith('mock-')) {
-      // For mock sessions, use a direct WebSocket URL
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsHost = window.location.hostname === 'localhost' ? 'api.infrawatch.website' : window.location.host;
-      const wsUrl = `${wsProtocol}//${wsHost}/ws-ssh`;
-
-      console.log('Using mock WebSocket URL:', wsUrl);
-      return wsUrl;
+    if (!sessionId) {
+      console.error('No session ID provided');
+      return null;
     }
 
-    // For real sessions, use the WebSocket URL from the session info
-    // The API returns a complete WebSocket URL
-    const wsUrl = `wss://api.infrawatch.website/ws-ssh`;
+    console.log('handleTerminalConnect called with:', { vmId, sessionId });
+
+    // Determine the WebSocket URL based on environment
+    let wsUrl;
+
+    // Use secure WebSocket for production, regular for localhost
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+    // Use the API domain for WebSocket connection
+    // For local development, connect to the deployed API
+    const wsHost = window.location.hostname === 'localhost' ? 'api.infrawatch.website' : window.location.host;
+
+    // Construct the WebSocket URL
+    wsUrl = `${wsProtocol}//${wsHost}/ws-ssh`;
 
     // Log connection attempt for debugging
-    console.log('Attempting to connect to WebSocket with:', {
+    console.log('Connecting to WebSocket:', {
       vmId,
       sessionId,
-      hostname: window.location.hostname,
+      protocol: wsProtocol,
+      host: wsHost,
       wsUrl: wsUrl
     });
 
-    // Return WebSocket URL
     return wsUrl;
   };
 
@@ -328,14 +333,12 @@ const Terminal = () => {
         </Card>
       ) : (
         <Card className="terminal-card">
-          <TerminalComponent
+          <BasicTerminal
             vmId={vmId}
             vmName={vm?.name}
             sessionId={sessionId}
             onConnect={handleTerminalConnect}
             onDisconnect={handleTerminalDisconnect}
-            onData={handleTerminalData}
-            autoConnect={true}
           />
         </Card>
       )}

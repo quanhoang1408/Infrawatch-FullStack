@@ -73,13 +73,23 @@ class VaultSSHService {
 
       // Try to sign the key with Vault
       try {
+        logger.info(`Sending public key to Vault for signing: ${formattedKey.substring(0, 20)}...`);
+
         const { data } = await vault.write(`${config.vault.mount}/sign/${config.vault.role}`, {
           public_key: formattedKey,
           cert_type: 'user',
           username,
           valid_principals: username,
-          ttl: "5m" // Short-lived certificate for web SSH
+          ttl: "30m" // Increased certificate lifetime for testing
         });
+
+        // Log the signed certificate format
+        if (data.signed_key) {
+          logger.info(`Received signed certificate from Vault: ${data.signed_key.substring(0, 20)}...`);
+          logger.debug(`Certificate serial number: ${data.serial_number}`);
+        } else {
+          logger.warn('No signed certificate received from Vault');
+        }
 
         logger.info(`Successfully signed SSH key for user ${username}, serial: ${data.serial_number}`);
 
@@ -96,18 +106,20 @@ class VaultSSHService {
 
       // If Vault is not configured or there's an error, provide a mock certificate for testing
       if (!config.vault.token || error.message.includes('no vault token')) {
-        logger.warn('Vault token not configured or invalid. Using mock certificate for testing.');
+        logger.warn('Vault token not configured or invalid. Using private key authentication without certificate.');
         return {
-          certificate: publicKey, // Use public key as certificate for testing
+          // Return null certificate to fall back to private key authentication
+          certificate: null,
           serialNumber: `mock-serial-${Date.now()}`
         };
       }
 
-      // For development/testing, we can return a mock certificate for any error
+      // For development/testing, we can return a null certificate for any error
       // This allows testing the SSH terminal feature without a working Vault setup
-      logger.warn('Using mock certificate due to signing error');
+      // by falling back to private key or password authentication
+      logger.warn('Vault signing error. Falling back to private key authentication without certificate.');
       return {
-        certificate: publicKey, // Use public key as certificate for testing
+        certificate: null,
         serialNumber: `mock-error-${Date.now()}`
       };
     }

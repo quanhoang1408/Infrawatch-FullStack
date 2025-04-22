@@ -56,7 +56,10 @@
     overflow: hidden;
   }
 
-  .iw-terminal {
+  .iw-terminal,
+  .basic-terminal,
+  .simple-terminal {
     flex: 1;
+    height: 100%;
   }
 }
