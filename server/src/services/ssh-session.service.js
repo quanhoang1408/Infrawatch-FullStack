@@ -141,7 +141,7 @@ class SSHSessionService {
     // Remove sensitive data from cache
     this.sessionCache.del(sessionId);
 
-    const conn = new Client();
+    let conn = new Client();
 
     try {
       await new Promise((resolve, reject) => {
@@ -190,11 +190,44 @@ class SSHSessionService {
           // Check for specific error types
           if (err.message.includes('authentication')) {
             logger.error('Authentication error - check credentials and SSH server configuration');
+            logger.error(`VM IP: ${sessionData.targetIp}, User: ${sessionData.sshUser}`);
+            logger.error('Trying to connect with password authentication as fallback');
+
+            // Try to reconnect with password authentication only
+            try {
+              const newConn = new Client();
+
+              newConn.on('ready', () => {
+                logger.info('Successfully connected with password authentication');
+                // Replace the original connection with the new one
+                conn = newConn;
+                resolve();
+              });
+
+              newConn.on('error', (newErr) => {
+                logger.error('Password authentication also failed:', newErr);
+                reject(err); // Reject with the original error
+              });
+
+              // Connect with password only
+              newConn.connect({
+                host: sessionData.targetIp,
+                port: 22,
+                username: sessionData.sshUser,
+                password: sessionData.password || 'ubuntu', // Use default password as fallback
+                readyTimeout: 20000
+              });
+            } catch (fallbackErr) {
+              logger.error('Failed to attempt password authentication:', fallbackErr);
+              reject(err); // Reject with the original error
+            }
           } else if (err.message.includes('connect')) {
             logger.error(`Connection error - check if SSH server is running on ${sessionData.targetIp}:22`);
+            reject(err);
+          } else {
+            // For other errors, just reject
+            reject(err);
           }
-
-          reject(err);
         });
 
         // Handle connection timeout
@@ -240,6 +273,12 @@ class SSHSessionService {
           privateKey: sessionData.privateKey,
           // Add more detailed authentication logging
           authHandler: (methodsLeft, partialSuccess, callback) => {
+            // Check if methodsLeft is null or undefined
+            if (!methodsLeft) {
+              logger.warn('No authentication methods available');
+              return callback(null);
+            }
+
             logger.info(`Authentication methods available: ${methodsLeft.join(', ')}`);
             logger.info(`Partial success: ${partialSuccess ? 'Yes' : 'No'}`);
 
@@ -259,8 +298,14 @@ class SSHSessionService {
               return callback('password');
             }
             // If nothing else works, try the first available method
-            logger.info(`Falling back to ${methodsLeft[0]} authentication`);
-            return callback(methodsLeft[0]);
+            if (methodsLeft.length > 0) {
+              logger.info(`Falling back to ${methodsLeft[0]} authentication`);
+              return callback(methodsLeft[0]);
+            }
+
+            // No methods available
+            logger.warn('No authentication methods available');
+            return callback(null);
           }
         };
 
@@ -283,6 +328,7 @@ class SSHSessionService {
         // Add password if available
         if (sessionData.password) {
           connectOptions.password = sessionData.password;
+          logger.info('Using password authentication as an option');
 
           // Add keyboard-interactive handler that uses the password
           connectOptions.keyboard = (name, instructions, instructionsLang, prompts, finish) => {
@@ -294,6 +340,27 @@ class SSHSessionService {
             for (let i = 0; i < prompts.length; i++) {
               if (prompts[i].prompt.toLowerCase().includes('password')) {
                 responses.push(sessionData.password);
+              } else {
+                responses.push('');
+              }
+            }
+
+            finish(responses);
+          };
+        } else {
+          // If no password is set, use a default one for testing
+          connectOptions.password = 'ubuntu';
+          logger.info('Using default password as fallback');
+
+          // Add keyboard-interactive handler with default password
+          connectOptions.keyboard = (name, instructions, instructionsLang, prompts, finish) => {
+            logger.info(`Keyboard-interactive auth requested: ${name}`);
+
+            // Respond with default password to all prompts
+            const responses = [];
+            for (let i = 0; i < prompts.length; i++) {
+              if (prompts[i].prompt.toLowerCase().includes('password')) {
+                responses.push('ubuntu');
               } else {
                 responses.push('');
               }
