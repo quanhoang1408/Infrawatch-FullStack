@@ -27,9 +27,12 @@ class SSHSessionService {
 
       // Generate SSH key using ssh-keygen (most reliable way to get correct format)
       try {
-        execSync(`ssh-keygen -t rsa -b 2048 -f "${keyPath}" -N "" -C "web-ssh-key"`, {
+        // Use -m PEM to ensure the private key is in PEM format
+        execSync(`ssh-keygen -t rsa -b 2048 -m PEM -f "${keyPath}" -N "" -C "web-ssh-key"`, {
           stdio: 'ignore'
         });
+
+        logger.info('Successfully executed ssh-keygen command');
       } catch (error) {
         logger.error('Failed to execute ssh-keygen:', error);
         // Fallback to Node.js crypto if ssh-keygen fails
@@ -44,6 +47,15 @@ class SSHSessionService {
       logger.info('Generated SSH key pair using ssh-keygen');
       logger.debug(`Public key format: ${publicKey.substring(0, 20)}...`);
       logger.debug(`Private key format: ${privateKey.substring(0, 20)}...`);
+
+      // Verify the keys are in the correct format
+      if (!privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+        logger.warn('Private key is not in PEM format, may cause authentication issues');
+      }
+
+      if (!publicKey.startsWith('ssh-rsa ')) {
+        logger.warn('Public key is not in OpenSSH format, may cause signing issues');
+      }
 
       // Clean up temporary files
       try {
@@ -73,16 +85,28 @@ class SSHSessionService {
           format: 'pem'
         },
         privateKeyEncoding: {
-          type: 'pkcs8',
+          type: 'pkcs1', // Use pkcs1 format for better compatibility with SSH
           format: 'pem'
         }
       });
 
-      // For the fallback method, we'll use a simpler approach
-      // Just return the PEM format keys directly
-      // Vault will have to handle this format or we'll need to use mock data
+      // Log the generated keys for debugging
+      logger.debug(`Fallback public key (first 20 chars): ${tempKeyPair.publicKey.substring(0, 20)}...`);
+      logger.debug(`Fallback private key (first 20 chars): ${tempKeyPair.privateKey.substring(0, 20)}...`);
+
+      // Convert the public key to OpenSSH format
+      // This is a simplified conversion and may not work in all cases
+      // The proper way would be to use ssh-keygen to convert the key
+      const publicKeyLines = tempKeyPair.publicKey
+        .replace('-----BEGIN PUBLIC KEY-----\n', '')
+        .replace('\n-----END PUBLIC KEY-----\n', '')
+        .replace(/\n/g, '');
+
+      const sshPublicKey = `ssh-rsa ${publicKeyLines} web-ssh-key`;
+      logger.debug(`Converted public key (first 20 chars): ${sshPublicKey.substring(0, 20)}...`);
+
       return {
-        publicKey: tempKeyPair.publicKey,
+        publicKey: sshPublicKey,
         privateKey: tempKeyPair.privateKey
       };
     } catch (error) {
@@ -186,46 +210,33 @@ class SSHSessionService {
         conn.on('error', (err) => {
           logger.error('SSH connection error:', err);
           logger.error(`Error details: ${err.message}`);
+          logger.error(`Error stack: ${err.stack}`);
 
           // Check for specific error types
           if (err.message.includes('authentication')) {
             logger.error('Authentication error - check credentials and SSH server configuration');
             logger.error(`VM IP: ${sessionData.targetIp}, User: ${sessionData.sshUser}`);
-            logger.error('Trying to connect with password authentication as fallback');
 
-            // Try to reconnect with password authentication only
-            try {
-              const newConn = new Client();
-
-              newConn.on('ready', () => {
-                logger.info('Successfully connected with password authentication');
-                // Replace the original connection with the new one
-                conn = newConn;
-                resolve();
-              });
-
-              newConn.on('error', (newErr) => {
-                logger.error('Password authentication also failed:', newErr);
-                reject(err); // Reject with the original error
-              });
-
-              // Connect with password only
-              newConn.connect({
-                host: sessionData.targetIp,
-                port: 22,
-                username: sessionData.sshUser,
-                password: sessionData.password || 'ubuntu', // Use default password as fallback
-                readyTimeout: 20000
-              });
-            } catch (fallbackErr) {
-              logger.error('Failed to attempt password authentication:', fallbackErr);
-              reject(err); // Reject with the original error
+            // Log detailed information about the authentication attempt
+            logger.error('Authentication details:');
+            logger.error(`- Private key format: ${sessionData.privateKey ? sessionData.privateKey.substring(0, 20) + '...' : 'Not available'}`);
+            logger.error(`- Certificate available: ${sessionData.certificate ? 'Yes' : 'No'}`);
+            if (sessionData.certificate) {
+              logger.error(`- Certificate format: ${sessionData.certificate.substring(0, 20)}...`);
             }
+
+            // Reject with detailed error
+            reject(new Error(`Authentication failed for user ${sessionData.sshUser}@${sessionData.targetIp}: ${err.message}`));
           } else if (err.message.includes('connect')) {
             logger.error(`Connection error - check if SSH server is running on ${sessionData.targetIp}:22`);
-            reject(err);
+            reject(new Error(`Failed to connect to ${sessionData.targetIp}:22: ${err.message}`));
+          } else if (err.message.includes('certificate')) {
+            logger.error(`Certificate error: ${err.message}`);
+            logger.error('This may indicate an issue with the certificate format or validation');
+            reject(new Error(`Certificate error: ${err.message}`));
           } else {
-            // For other errors, just reject
+            // For other errors, log additional details and reject
+            logger.error(`Unhandled SSH error: ${err.message}`);
             reject(err);
           }
         });
@@ -258,116 +269,39 @@ class SSHSessionService {
         logger.info(`Connecting to VM: ${sessionData.targetIp} as user: ${sessionData.sshUser}`);
         logger.info(`Using certificate: ${sessionData.certificate ? 'Yes' : 'No'}`);
 
-        // Connect to VM with more options
+        // Use certificate-based authentication
+        logger.info(`Connecting to VM: ${sessionData.targetIp} as user: ${sessionData.sshUser}`);
+        logger.info(`Using certificate: ${sessionData.certificate ? 'Yes' : 'No'}`);
+
+        // Log the private key and certificate for debugging
+        if (sessionData.privateKey) {
+          logger.debug(`Private key (first 20 chars): ${sessionData.privateKey.substring(0, 20)}...`);
+        } else {
+          logger.error('No private key available');
+        }
+
+        if (sessionData.certificate) {
+          logger.debug(`Certificate (first 20 chars): ${sessionData.certificate.substring(0, 20)}...`);
+        } else {
+          logger.warn('No certificate available, will use private key authentication');
+        }
+
+        // Create connection options with certificate-based authentication
         const connectOptions = {
           host: sessionData.targetIp,
           port: 22,
           username: sessionData.sshUser,
+          // Use the private key for authentication
+          privateKey: sessionData.privateKey,
           // Add debug option to see more details
           debug: (message) => logger.debug(`SSH2 Debug: ${message}`),
           // Increase readyTimeout
-          readyTimeout: 30000,
-          // Try all authentication methods
-          tryKeyboard: true,
-          // Use the private key for authentication
-          privateKey: sessionData.privateKey,
-          // Add more detailed authentication logging
-          authHandler: (methodsLeft, partialSuccess, callback) => {
-            // Check if methodsLeft is null or undefined
-            if (!methodsLeft) {
-              logger.warn('No authentication methods available');
-              return callback(null);
-            }
-
-            logger.info(`Authentication methods available: ${methodsLeft.join(', ')}`);
-            logger.info(`Partial success: ${partialSuccess ? 'Yes' : 'No'}`);
-
-            // Always try publickey first
-            if (methodsLeft.includes('publickey')) {
-              logger.info('Trying publickey authentication');
-              return callback('publickey');
-            }
-            // Then try keyboard-interactive
-            if (methodsLeft.includes('keyboard-interactive')) {
-              logger.info('Trying keyboard-interactive authentication');
-              return callback('keyboard-interactive');
-            }
-            // Then try password
-            if (methodsLeft.includes('password')) {
-              logger.info('Trying password authentication');
-              return callback('password');
-            }
-            // If nothing else works, try the first available method
-            if (methodsLeft.length > 0) {
-              logger.info(`Falling back to ${methodsLeft[0]} authentication`);
-              return callback(methodsLeft[0]);
-            }
-
-            // No methods available
-            logger.warn('No authentication methods available');
-            return callback(null);
-          }
+          readyTimeout: 30000
         };
 
         // Add certificate if available
         if (sessionData.certificate) {
-          logger.debug(`Certificate format: ${sessionData.certificate.substring(0, 20)}...`);
-
-          // Check if the certificate is in the correct format
-          if (sessionData.certificate.includes('ssh-rsa-cert-v01@openssh.com')) {
-            logger.info('Certificate appears to be in the correct format');
-          } else {
-            logger.warn('Certificate may not be in the correct format');
-          }
-
           connectOptions.certificate = sessionData.certificate;
-        } else {
-          logger.warn('No certificate available for SSH authentication');
-        }
-
-        // Add password if available
-        if (sessionData.password) {
-          connectOptions.password = sessionData.password;
-          logger.info('Using password authentication as an option');
-
-          // Add keyboard-interactive handler that uses the password
-          connectOptions.keyboard = (name, instructions, instructionsLang, prompts, finish) => {
-            logger.info(`Keyboard-interactive auth requested: ${name}`);
-            logger.debug(`Prompts: ${JSON.stringify(prompts)}`);
-
-            // Respond with password to all prompts
-            const responses = [];
-            for (let i = 0; i < prompts.length; i++) {
-              if (prompts[i].prompt.toLowerCase().includes('password')) {
-                responses.push(sessionData.password);
-              } else {
-                responses.push('');
-              }
-            }
-
-            finish(responses);
-          };
-        } else {
-          // If no password is set, use a default one for testing
-          connectOptions.password = 'ubuntu';
-          logger.info('Using default password as fallback');
-
-          // Add keyboard-interactive handler with default password
-          connectOptions.keyboard = (name, instructions, instructionsLang, prompts, finish) => {
-            logger.info(`Keyboard-interactive auth requested: ${name}`);
-
-            // Respond with default password to all prompts
-            const responses = [];
-            for (let i = 0; i < prompts.length; i++) {
-              if (prompts[i].prompt.toLowerCase().includes('password')) {
-                responses.push('ubuntu');
-              } else {
-                responses.push('');
-              }
-            }
-
-            finish(responses);
-          };
         }
 
         // Connect with the options
