@@ -21,11 +21,9 @@ const { Option } = Select;
  */
 const Terminal = () => {
   const { vmId } = useParams();
-  console.log('Terminal page - vmId from URL params:', vmId);
   const navigate = useNavigate();
   const { showError, showSuccess } = useNotification();
   const { getVMDetail, fetchVMById } = useVM();
-  console.log('Terminal - useVM hook loaded:', { getVMDetail, fetchVMById });
 
   const [vm, setVM] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -39,26 +37,19 @@ const Terminal = () => {
   useEffect(() => {
     const fetchVM = async () => {
       try {
-        console.log('Fetching VM details for ID:', vmId);
-
         // No mock data - using real API only
 
         // Try fetchVMById first, then fallback to getVMDetail
         try {
-          console.log('Trying fetchVMById...');
           const vmData = await fetchVMById(vmId);
-          console.log('VM data received from fetchVMById:', vmData);
           setVM(vmData);
           setLoading(false);
         } catch (fetchError) {
-          console.log('fetchVMById failed, trying getVMDetail...', fetchError);
           const vmData = await getVMDetail(vmId);
-          console.log('VM data received from getVMDetail:', vmData);
           setVM(vmData);
           setLoading(false);
         }
       } catch (error) {
-        console.error('Error fetching VM details:', error);
 
         // Specific handling for timeout errors
         if (error.code === 'ECONNABORTED') {
@@ -186,6 +177,9 @@ const Terminal = () => {
     // Construct the WebSocket URL
     wsUrl = `${wsProtocol}//${wsHost}/ws-ssh`;
 
+    // Always add sessionId as a query parameter for better compatibility
+    wsUrl = `${wsUrl}?sessionId=${sessionId}`;
+
     // Add debug information
     console.log('WebSocket configuration:', {
       currentProtocol: window.location.protocol,
@@ -207,7 +201,7 @@ const Terminal = () => {
   };
 
   // Handle terminal disconnection
-  const handleTerminalDisconnect = (vmId, sessionId, reason) => {
+  const handleTerminalDisconnect = (_, __, reason) => {
     setShowForm(true);
     setSessionId(null);
 
@@ -218,14 +212,8 @@ const Terminal = () => {
     }
   };
 
-  // Handle terminal data
-  const handleTerminalData = (data) => {
-    // Handle terminal data if needed
-  };
-
   // Handle back button click
   const handleBack = () => {
-    console.log('Navigating back to VM details for VM:', vmId);
     navigate(`/vm/${vmId}`);
   };
 
@@ -352,12 +340,10 @@ const Terminal = () => {
                   try {
                     setConnecting(true);
                     // Test API connection
-                    const response = await api.get('/auth/me');
-                    console.log('API connection test successful:', response.data);
+                    await api.get('/auth/me');
                     showSuccess('API connection test successful');
                     setConnecting(false);
                   } catch (error) {
-                    console.error('API connection test failed:', error);
                     showError('API Connection Test', 'Failed to connect to API: ' + (error.message || 'Unknown error'));
                     setConnecting(false);
                   }

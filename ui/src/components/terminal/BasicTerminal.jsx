@@ -26,16 +26,17 @@ const BasicTerminal = ({
     { type: 'info', text: 'Terminal ready. Click Connect to start session.' }
   ]);
   const [currentInput, setCurrentInput] = useState('');
+  const [renderKey, setRenderKey] = useState(0); // Add a render key to force re-renders
 
   // Add output to terminal
   const addOutput = (type, text) => {
     // Check if text is a valid React child
     if (text instanceof Blob || text instanceof ArrayBuffer) {
-      console.error('Invalid React child: Received binary data instead of string', text);
+      console.error('Invalid React child: Received binary data instead of string');
       // Convert to string representation
       text = `[Binary data: ${text.size || text.byteLength} bytes]`;
     } else if (typeof text !== 'string' && typeof text !== 'number') {
-      console.warn('Non-string output:', typeof text, text);
+      console.warn('Non-string output:', typeof text);
       // Convert to string
       try {
         text = String(text);
@@ -44,7 +45,26 @@ const BasicTerminal = ({
       }
     }
 
-    setOutput(prev => [...prev, { type, text }]);
+    // Log the output being added
+    console.log(`ADDING TO TERMINAL: ${type.toUpperCase()} (${text.length} bytes)`);
+    console.log(text);
+
+    // Force state update with a new array reference
+    setOutput(prev => {
+      const newOutput = [...prev, { type, text }];
+      return newOutput;
+    });
+
+    // Force render by updating the render key
+    setRenderKey(prev => prev + 1);
+
+    // Force scroll to bottom after state update
+    setTimeout(() => {
+      if (terminalRef.current) {
+        terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        console.log('Scrolled terminal to bottom');
+      }
+    }, 10);
   };
 
   // Handle connection
@@ -298,13 +318,16 @@ const BasicTerminal = ({
 
       ws.onmessage = (event) => {
         try {
-          // Log all received data for debugging
-          console.log('WebSocket received data:', {
-            type: typeof event.data,
-            isBlob: event.data instanceof Blob,
-            length: event.data.length || (event.data.size ? event.data.size : 'unknown'),
-            preview: typeof event.data === 'string' ? event.data.substring(0, 100) : 'non-string data'
-          });
+          // Show important data without clearing console
+          console.log('======= WEBSOCKET MESSAGE RECEIVED =======');
+          console.log('Data type:', typeof event.data);
+          console.log('Is Blob:', event.data instanceof Blob);
+          console.log('Data length:', event.data.length || (event.data.size ? event.data.size : 'unknown'));
+
+          if (typeof event.data === 'string') {
+            console.log('RAW DATA FROM SERVER:');
+            console.log(event.data);
+          }
 
           // Check if the data is a Blob
           if (event.data instanceof Blob) {
@@ -314,27 +337,25 @@ const BasicTerminal = ({
               try {
                 // Convert ArrayBuffer to string
                 const text = new TextDecoder('utf-8').decode(reader.result);
-                console.log('%c Blob decoded to text:', 'background: #9C27B0; color: white; padding: 2px 5px; border-radius: 2px;',
-                  text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+                console.log('BLOB DATA FROM SERVER:');
+                console.log(text);
 
                 // Try to parse as JSON first
                 try {
                   const jsonData = JSON.parse(text);
-                  console.log('%c Parsed JSON from blob:', 'background: #E91E63; color: white; padding: 2px 5px; border-radius: 2px;', jsonData);
+                  console.log('PARSED JSON FROM BLOB:');
+                  console.log(jsonData);
 
                   if (jsonData.type === 'data') {
                     // Add the data to output
                     addOutput('output', jsonData.data);
-                    document.title = `Got JSON data from blob: ${jsonData.data.length} bytes`;
                   } else {
                     // Unknown type, add the whole JSON
                     addOutput('output', JSON.stringify(jsonData));
                   }
                 } catch (jsonError) {
                   // Not JSON, add as raw text
-                  console.log('Blob is not JSON, adding as raw text');
                   addOutput('output', text);
-                  document.title = `Got raw text from blob: ${text.length} bytes`;
                 }
               } catch (blobError) {
                 console.error('Error processing binary data:', blobError);
@@ -352,44 +373,36 @@ const BasicTerminal = ({
           // Try to parse as JSON
           try {
             const data = JSON.parse(event.data);
-            console.log('%c Parsed JSON data:', 'background: #4CAF50; color: white; padding: 2px 5px; border-radius: 2px;', data);
+            console.log('PARSED JSON DATA:');
+            console.log(data);
 
             // Handle different message types
             if (data.type === 'data') {
               // Regular data message
-              console.log('%c Received data message:', 'background: #2196F3; color: white; padding: 2px 5px; border-radius: 2px;', data.data);
+              console.log('DATA CONTENT:');
+              console.log(data.data);
 
-              // Log to document for debugging
-              document.title = `Got data: ${data.data.length} bytes`;
+              // Make sure data.data is a string
+              const outputText = typeof data.data === 'string' ? data.data : String(data.data);
 
               // Add to terminal output
-              addOutput('output', data.data);
-
-              // Force UI update
-              setTimeout(() => {
-                if (terminalRef.current) {
-                  terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-                  console.log('Forced scroll after data');
-                }
-              }, 10);
+              addOutput('output', outputText);
             } else if (data.type === 'pong') {
-              // Pong response from server
-              console.log('Received pong from server', data.timestamp);
-              // Update last pong timestamp
+              // Pong response from server - no need to log
               websocketRef.current.lastPongTime = Date.now();
             } else {
               // Unknown message type
-              console.log('%c Unknown message type:', 'background: #FF9800; color: white; padding: 2px 5px; border-radius: 2px;', data.type);
+              console.log('Unknown message type:', data.type);
               addOutput('output', JSON.stringify(data));
             }
           } catch (e) {
             // Not JSON, treat as raw data (but ensure it's a string)
-            console.log('Failed to parse as JSON, treating as raw data:', e.message);
             if (typeof event.data === 'string') {
-              console.log('Raw string data:', event.data);
+              console.log('RAW STRING DATA:');
+              console.log(event.data);
               addOutput('output', event.data);
             } else {
-              console.warn('Received non-string, non-blob data:', typeof event.data);
+              console.log('NON-STRING DATA:', typeof event.data);
               addOutput('output', String(event.data));
             }
           }
@@ -613,7 +626,6 @@ const BasicTerminal = ({
   const updateCurrentInput = useCallback((key) => {
     if (key === '\r') {
       // Enter key - submit command
-      console.log('Submitting command:', currentInput);
       // Add the command to output
       addOutput('command', `$ ${currentInput}`);
       // Clear current input
@@ -629,17 +641,12 @@ const BasicTerminal = ({
 
   // Handle key down events - memoized to avoid dependency issues
   const handleKeyDown = useCallback((event) => {
-    console.log('Key pressed:', event.key, 'Connected:', connected, 'WebSocket:', !!websocketRef.current);
-
     if (!connected || !websocketRef.current) {
-      console.log('Not handling key press: not connected or no websocket');
       return;
     }
 
     // Always process key events when connected
     // We're relying on the hidden textarea to capture all keyboard input
-
-    console.log('Processing key press:', event.key);
 
     // Send key to server
     const key = event.key;
@@ -720,14 +727,14 @@ const BasicTerminal = ({
               data: currentInput + '\r'
             });
             websocketRef.current.send(jsonData);
-            console.log('Sent command as JSON:', currentInput);
+            console.log('COMMAND SENT:', currentInput);
           } catch (jsonError) {
             console.error('Error sending command as JSON:', jsonError);
 
             // Fallback to raw format
             const command = currentInput + '\r';
             websocketRef.current.send(command);
-            console.log('Sent command as raw string:', currentInput);
+            console.log('COMMAND SENT (raw):', currentInput);
           }
         } catch (error) {
           console.error('Error sending command:', error);
@@ -797,7 +804,6 @@ const BasicTerminal = ({
         const scrollTop = terminalRef.current.scrollTop;
 
         hiddenInput.focus();
-        console.log('Focused hidden input');
 
         // Restore scroll position after focus
         setTimeout(() => {
@@ -807,7 +813,6 @@ const BasicTerminal = ({
         }, 0);
       } else {
         terminalRef.current.focus();
-        console.log('Focused terminal div (fallback)');
       }
     }
   };
@@ -823,7 +828,6 @@ const BasicTerminal = ({
       const textarea = terminalRef.current?.querySelector('.hidden-input');
       if (textarea && document.activeElement !== textarea) {
         textarea.focus();
-        console.log('Auto-focused hidden textarea on terminal focus');
       }
     }, 0);
   };
@@ -869,12 +873,12 @@ const BasicTerminal = ({
         onFocus={handleTerminalFocus}
         onBlur={handleTerminalBlur}
         onKeyDown={(e) => {
-          console.log('Direct keydown event on terminal:', e.key);
           if (handleKeyDownRef.current) {
             handleKeyDownRef.current(e);
           }
         }}
         tabIndex="0"
+        key={renderKey} // Add render key to force re-renders
       >
         {/* Hidden textarea to capture keyboard events */}
         <textarea
@@ -885,7 +889,6 @@ const BasicTerminal = ({
           autoCorrect="off"
           autoCapitalize="off"
           onKeyDown={(e) => {
-            console.log('Hidden textarea keydown:', e.key);
             e.stopPropagation();
             if (handleKeyDownRef.current) {
               handleKeyDownRef.current(e);
@@ -911,7 +914,7 @@ const BasicTerminal = ({
         />
         {/* Output lines */}
         {output.map((line, index) => (
-          <div key={index} className={`terminal-line ${line.type}`}>
+          <div key={`${index}-${renderKey}`} className={`terminal-line ${line.type}`}>
             {line.text}
           </div>
         ))}

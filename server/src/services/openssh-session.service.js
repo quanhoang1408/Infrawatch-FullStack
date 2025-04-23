@@ -492,11 +492,14 @@ class OpenSSHSessionService {
               logger.info(`Received command: ${commandStr}`);
 
               // Check if it's a simple command that we can execute directly
-              if (jsonData.data.trim().endsWith('\r')) {
-                const cmd = jsonData.data.trim().replace('\r', '');
+              logger.info(`Checking if command is simple: ${jsonData.data}`);
+              if (jsonData.data.includes('\r')) {
+                const cmd = jsonData.data.replace('\r', '').trim();
+                logger.info(`Extracted command: '${cmd}'`);
 
                 // For simple commands, try executing directly and sending result
-                if (['ls', 'pwd', 'whoami', 'hostname', 'date', 'echo'].some(c => cmd.startsWith(c))) {
+                if (['ls', 'pwd', 'whoami', 'hostname', 'date', 'echo', 'cat', 'ps', 'free', 'df', 'du', 'uname', 'id', 'uptime', 'w', 'who', 'last', 'netstat', 'ifconfig', 'ip'].some(c => cmd.startsWith(c))) {
+                  logger.info(`Detected simple command: ${cmd}`);
                   try {
                     // Still send the command to the SSH process
                     logger.debug(`Writing command to SSH process: ${commandStr}`);
@@ -507,11 +510,26 @@ class OpenSSHSessionService {
                     const { exec } = require('child_process');
                     logger.info(`Executing command directly as fallback: ${cmd}`);
 
+                    // Log the command and parameters for debugging
+                    logger.info(`SSH command: ssh -i ${sessionData.keyPath} -o CertificateFile=${sessionData.certPath} -o StrictHostKeyChecking=no ${sessionData.sshUser}@${sessionData.targetIp} "${cmd}"`);
+
                     // Execute the command with a timeout
                     exec(`ssh -i ${sessionData.keyPath} -o CertificateFile=${sessionData.certPath} -o StrictHostKeyChecking=no ${sessionData.sshUser}@${sessionData.targetIp} "${cmd}"`,
-                      { timeout: 5000 }, (error, stdout, stderr) => {
+                      { timeout: 10000 }, (error, stdout, stderr) => {
                         if (error) {
                           logger.error(`Error executing command directly: ${error.message}`);
+                          // Send error message to client
+                          if (ws.readyState === 1) {
+                            try {
+                              ws.send(JSON.stringify({
+                                type: 'data',
+                                data: `Error executing command: ${error.message}\r\n`
+                              }));
+                              logger.info('Error message sent to client');
+                            } catch (sendError) {
+                              logger.error(`Error sending error message: ${sendError.message}`);
+                            }
+                          }
                           return;
                         }
 
@@ -520,13 +538,35 @@ class OpenSSHSessionService {
                           // Send the result to the client
                           if (ws.readyState === 1) {
                             try {
+                              // First try sending as raw data
+                              try {
+                                ws.send(Buffer.from(stdout + '\r\n'));
+                                logger.info('Raw stdout data sent directly');
+                              } catch (rawError) {
+                                logger.error(`Error sending raw stdout: ${rawError.message}`);
+                              }
+
+                              // Also send as JSON
                               ws.send(JSON.stringify({
                                 type: 'data',
                                 data: stdout + '\r\n'
                               }));
-                              logger.info('Direct command result sent to client');
+                              logger.info('Direct command result sent to client as JSON');
                             } catch (sendError) {
                               logger.error(`Error sending direct command result: ${sendError.message}`);
+                            }
+                          }
+                        } else {
+                          logger.warn('Command executed successfully but returned no stdout');
+                          // Send a message to the client indicating no output
+                          if (ws.readyState === 1) {
+                            try {
+                              ws.send(JSON.stringify({
+                                type: 'data',
+                                data: 'Command executed successfully but returned no output\r\n'
+                              }));
+                            } catch (sendError) {
+                              logger.error(`Error sending no-output message: ${sendError.message}`);
                             }
                           }
                         }
@@ -536,10 +576,20 @@ class OpenSSHSessionService {
                           // Send stderr to client as well
                           if (ws.readyState === 1) {
                             try {
+                              // First try sending as raw data
+                              try {
+                                ws.send(Buffer.from(stderr + '\r\n'));
+                                logger.info('Raw stderr data sent directly');
+                              } catch (rawError) {
+                                logger.error(`Error sending raw stderr: ${rawError.message}`);
+                              }
+
+                              // Also send as JSON
                               ws.send(JSON.stringify({
                                 type: 'data',
                                 data: stderr + '\r\n'
                               }));
+                              logger.info('Direct command stderr sent to client as JSON');
                             } catch (sendError) {
                               logger.error(`Error sending direct command stderr: ${sendError.message}`);
                             }
@@ -548,6 +598,18 @@ class OpenSSHSessionService {
                     });
                   } catch (execError) {
                     logger.error(`Error setting up direct command execution: ${execError.message}`);
+                    // Send error message to client
+                    if (ws.readyState === 1) {
+                      try {
+                        ws.send(JSON.stringify({
+                          type: 'data',
+                          data: `Error executing command: ${execError.message}\r\n`
+                        }));
+                        logger.info('Error message sent to client');
+                      } catch (sendError) {
+                        logger.error(`Error sending error message: ${sendError.message}`);
+                      }
+                    }
                   }
                 } else {
                   // For complex commands, just send to SSH process
