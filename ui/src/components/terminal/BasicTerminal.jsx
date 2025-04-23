@@ -184,19 +184,32 @@ const BasicTerminal = ({
         addOutput('success', 'Connected to terminal session');
         addOutput('info', `VM: ${vmName || 'Unknown'} (${vmId})`);
         addOutput('info', '--------------------------------------------------');
-        addOutput('info', 'Click on the terminal and start typing to interact with the VM.');
-        addOutput('info', 'Press Ctrl+C to interrupt a command, Ctrl+D to exit.');
+        addOutput('info', 'CLICK ANYWHERE IN THE TERMINAL AREA TO START TYPING');
+        addOutput('info', 'The cursor will appear and you can type commands directly.');
+        addOutput('info', 'Press Enter to execute commands. Use Ctrl+C to interrupt.');
         addOutput('info', '--------------------------------------------------');
 
         // Add keyboard event listener after connection is established
         if (handleKeyDownRef.current) {
+          console.log('Adding keydown event listener');
+          // Remove any existing listener first to avoid duplicates
+          document.removeEventListener('keydown', handleKeyDownRef.current);
           document.addEventListener('keydown', handleKeyDownRef.current);
+        } else {
+          console.warn('No handleKeyDownRef.current available');
         }
 
         // Auto-focus the terminal
         if (terminalRef.current) {
           setTimeout(() => {
-            terminalRef.current.focus();
+            const hiddenInput = terminalRef.current.querySelector('.hidden-input');
+            if (hiddenInput) {
+              hiddenInput.focus();
+              console.log('Auto-focused hidden input');
+            } else {
+              terminalRef.current.focus();
+              console.log('Auto-focused terminal div (fallback)');
+            }
           }, 100);
         }
 
@@ -477,6 +490,41 @@ const BasicTerminal = ({
   // Define handleKeyDown first (will be initialized later)
   const handleKeyDownRef = useRef(null);
 
+  // Method to send a command directly to the terminal
+  const sendCommand = useCallback((command) => {
+    if (!connected || !websocketRef.current) {
+      console.error('Cannot send command: not connected');
+      return false;
+    }
+
+    try {
+      // Send each character with a small delay to simulate typing
+      let i = 0;
+      const sendNextChar = () => {
+        if (i < command.length) {
+          const char = command[i++];
+          websocketRef.current.send(JSON.stringify({
+            type: 'input',
+            data: char
+          }));
+          setTimeout(sendNextChar, 10);
+        } else {
+          // Send Enter at the end
+          websocketRef.current.send(JSON.stringify({
+            type: 'input',
+            data: '\r'
+          }));
+        }
+      };
+
+      sendNextChar();
+      return true;
+    } catch (error) {
+      console.error('Error sending command:', error);
+      return false;
+    }
+  }, [connected]);
+
   // Handle disconnection
   const handleDisconnect = useCallback(() => {
     if (websocketRef.current) {
@@ -495,10 +543,17 @@ const BasicTerminal = ({
 
   // Handle key down events - memoized to avoid dependency issues
   const handleKeyDown = useCallback((event) => {
-    if (!connected || !websocketRef.current) return;
+    console.log('Key pressed:', event.key, 'Connected:', connected, 'WebSocket:', !!websocketRef.current);
 
-    // Only handle if terminal is focused
-    if (document.activeElement !== terminalRef.current) return;
+    if (!connected || !websocketRef.current) {
+      console.log('Not handling key press: not connected or no websocket');
+      return;
+    }
+
+    // Always process key events when connected
+    // We're relying on the hidden textarea to capture all keyboard input
+
+    console.log('Processing key press:', event.key);
 
     // Send key to server
     const key = event.key;
@@ -565,25 +620,41 @@ const BasicTerminal = ({
         data = key;
       }
 
-      // Send data as JSON to ensure it's processed correctly
-      try {
-        websocketRef.current.send(JSON.stringify({
-          type: 'input',
-          data: data
-        }));
-        console.log('Sent key:', key);
-      } catch (error) {
-        console.error('Error sending key:', error);
-        // Fallback to sending raw data
-        websocketRef.current.send(data);
+      // Update the current input line
+      updateCurrentInput(data);
+
+      // Only send to server on Enter key
+      if (data === '\r') {
+        // Send the entire command at once
+        try {
+          // Send the command followed by Enter
+          const command = currentInput + '\r';
+          websocketRef.current.send(command);
+          console.log('Sent command:', currentInput);
+        } catch (error) {
+          console.error('Error sending command:', error);
+          // Fallback to JSON format
+          try {
+            websocketRef.current.send(JSON.stringify({
+              type: 'input',
+              data: currentInput + '\r'
+            }));
+            console.log('Sent command as JSON:', currentInput);
+          } catch (jsonError) {
+            console.error('Error sending command as JSON:', jsonError);
+          }
+        }
       }
     }
-  }, [connected]);
+  }, [connected, currentInput]);
 
   // Store the callback in a ref to avoid dependency cycles
   useEffect(() => {
     handleKeyDownRef.current = handleKeyDown;
   }, [handleKeyDown]);
+
+  // Current input line
+  const [currentInput, setCurrentInput] = useState('');
 
   // Add output to terminal
   const addOutput = (type, text) => {
@@ -605,12 +676,34 @@ const BasicTerminal = ({
     setOutput(prev => [...prev, { type, text }]);
   };
 
+  // Update current input line
+  const updateCurrentInput = useCallback((key) => {
+    if (key === '\r') {
+      // Enter key - submit command
+      console.log('Submitting command:', currentInput);
+      // Add the command to output
+      addOutput('command', `$ ${currentInput}`);
+      // Clear current input
+      setCurrentInput('');
+    } else if (key === '\u007F') {
+      // Backspace - remove last character
+      setCurrentInput(prev => prev.slice(0, -1));
+    } else if (key.length === 1) {
+      // Regular character - add to input
+      setCurrentInput(prev => prev + key);
+    }
+  }, [currentInput]);
+
   // Scroll to bottom when output changes
   useEffect(() => {
     // Scroll to bottom
     if (terminalRef.current) {
       try {
-        terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        // Use requestAnimationFrame to ensure DOM has updated
+        requestAnimationFrame(() => {
+          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+          console.log('Scrolled terminal to bottom');
+        });
       } catch (error) {
         console.error('Error scrolling terminal to bottom:', error);
       }
@@ -643,9 +736,30 @@ const BasicTerminal = ({
   }, []);
 
   // Focus terminal on click
-  const handleTerminalClick = () => {
+  const handleTerminalClick = (e) => {
+    // Prevent default to avoid scrolling to top
+    if (e) e.preventDefault();
+
     if (terminalRef.current) {
-      terminalRef.current.focus();
+      // Focus the hidden input instead of the div
+      const hiddenInput = terminalRef.current.querySelector('.hidden-input');
+      if (hiddenInput) {
+        // Save current scroll position
+        const scrollTop = terminalRef.current.scrollTop;
+
+        hiddenInput.focus();
+        console.log('Focused hidden input');
+
+        // Restore scroll position after focus
+        setTimeout(() => {
+          if (terminalRef.current) {
+            terminalRef.current.scrollTop = scrollTop;
+          }
+        }, 0);
+      } else {
+        terminalRef.current.focus();
+        console.log('Focused terminal div (fallback)');
+      }
     }
   };
 
@@ -655,10 +769,21 @@ const BasicTerminal = ({
   // Handle focus and blur events
   const handleTerminalFocus = () => {
     setIsFocused(true);
+    // Focus the hidden textarea
+    setTimeout(() => {
+      const textarea = terminalRef.current?.querySelector('.hidden-input');
+      if (textarea && document.activeElement !== textarea) {
+        textarea.focus();
+        console.log('Auto-focused hidden textarea on terminal focus');
+      }
+    }, 0);
   };
 
-  const handleTerminalBlur = () => {
-    setIsFocused(false);
+  const handleTerminalBlur = (e) => {
+    // Only set as blurred if we're not focusing the textarea
+    if (e.relatedTarget !== terminalRef.current?.querySelector('.hidden-input')) {
+      setIsFocused(false);
+    }
   };
 
   return (
@@ -694,13 +819,62 @@ const BasicTerminal = ({
         onClick={handleTerminalClick}
         onFocus={handleTerminalFocus}
         onBlur={handleTerminalBlur}
+        onKeyDown={(e) => {
+          console.log('Direct keydown event on terminal:', e.key);
+          if (handleKeyDownRef.current) {
+            handleKeyDownRef.current(e);
+          }
+        }}
         tabIndex="0"
       >
+        {/* Hidden textarea to capture keyboard events */}
+        <textarea
+          className="hidden-input"
+          autoFocus={connected}
+          spellCheck="false"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          onKeyDown={(e) => {
+            console.log('Hidden textarea keydown:', e.key);
+            e.stopPropagation();
+            if (handleKeyDownRef.current) {
+              handleKeyDownRef.current(e);
+            }
+            // Prevent default for most keys to avoid textarea behavior
+            if (e.key !== 'F5' && e.key !== 'F12' && !e.ctrlKey) {
+              e.preventDefault();
+            }
+          }}
+          onInput={(e) => {
+            // Clear the textarea after each input to avoid accumulation
+            e.target.value = '';
+          }}
+          onBlur={() => {
+            // Re-focus if terminal is still focused
+            if (isFocused && connected) {
+              setTimeout(() => {
+                const textarea = terminalRef.current?.querySelector('.hidden-input');
+                if (textarea) textarea.focus();
+              }, 10);
+            }
+          }}
+        />
+        {/* Output lines */}
         {output.map((line, index) => (
           <div key={index} className={`terminal-line ${line.type}`}>
             {line.text}
           </div>
         ))}
+
+        {/* Current input line with cursor */}
+        {connected && (
+          <div className="terminal-line input-line">
+            <span className="prompt">$ </span>
+            <span className="input-text">{currentInput}</span>
+            {isFocused && <span className="cursor"></span>}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -711,7 +885,17 @@ const BasicTerminal = ({
 
       <div className="basic-terminal-status">
         {connecting && 'Connecting...'}
-        {connected && !isFocused && 'Click to focus terminal'}
+        {connected && !isFocused && (
+          <>
+            <span>Terminal not focused. </span>
+            <button
+              className="focus-terminal-btn"
+              onClick={handleTerminalClick}
+            >
+              Click to focus
+            </button>
+          </>
+        )}
         {connected && isFocused && 'Terminal ready (typing...)'}
         {!connecting && !connected && 'Disconnected'}
       </div>

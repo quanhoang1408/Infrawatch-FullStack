@@ -306,30 +306,53 @@ class OpenSSHSessionService {
       // Handle WebSocket messages (user input)
       ws.on('message', (data) => {
         try {
-          // Check if it's a JSON message
-          const jsonData = JSON.parse(data.toString());
+          // First try to parse as JSON
+          try {
+            const jsonData = JSON.parse(data.toString());
 
-          if (jsonData.type === 'ping') {
-            // Handle ping message
-            if (ws.readyState === 1) { // WebSocket.OPEN
-              ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-              logger.debug('Sent pong response to client');
-            }
-            return;
-          } else if (jsonData.type === 'input') {
-            // Handle input data from client
-            logger.debug(`Received input data: ${jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
+            if (jsonData.type === 'ping') {
+              // Handle ping message
+              if (ws.readyState === 1) { // WebSocket.OPEN
+                ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                logger.debug('Sent pong response to client');
+              }
+              return;
+            } else if (jsonData.type === 'input') {
+              // Handle input data from client
+              logger.info(`Received command: ${jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
 
-            // Write the input data to the SSH process
-            if (jsonData.data) {
-              writeToProcess(Buffer.from(jsonData.data));
+              // Write the input data to the SSH process
+              if (jsonData.data) {
+                writeToProcess(Buffer.from(jsonData.data));
+              }
+              return;
             }
+          } catch (jsonError) {
+            // Not JSON, handle as raw data
+          }
+
+          // Handle as raw data
+          if (typeof data === 'string' || data instanceof Buffer) {
+            const dataStr = data.toString();
+            // Log the command (but not every keystroke)
+            if (dataStr.includes('\r')) {
+              logger.info(`Received command: ${dataStr.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
+            } else {
+              logger.debug(`Received data: ${dataStr.length} bytes`);
+            }
+
+            // Write to the SSH process
+            writeToProcess(data);
             return;
           }
         } catch (e) {
-          // Not JSON, treat as regular input data
-          logger.debug(`Received non-JSON data: ${data.length} bytes`);
-          writeToProcess(data);
+          logger.error(`Error handling message: ${e.message}`);
+          // Try one last time to write the data
+          try {
+            writeToProcess(data);
+          } catch (writeError) {
+            logger.error(`Failed to write to process: ${writeError.message}`);
+          }
         }
       });
 
