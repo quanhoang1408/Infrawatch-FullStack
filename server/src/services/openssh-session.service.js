@@ -234,7 +234,17 @@ class OpenSSHSessionService {
         // Handle SSH process stdout
         sshProcess.stdout.on('data', (data) => {
           if (ws.readyState === 1) { // WebSocket.OPEN
-            ws.send(data);
+            try {
+              // Convert binary data to JSON format to avoid Blob rendering issues
+              ws.send(JSON.stringify({
+                type: 'data',
+                data: data.toString('utf8')
+              }));
+            } catch (error) {
+              logger.error(`Error sending stdout data: ${error.message}`);
+              // Fallback to sending raw data if JSON conversion fails
+              ws.send(data);
+            }
           }
         });
 
@@ -245,7 +255,17 @@ class OpenSSHSessionService {
 
           // Send stderr to client as well
           if (ws.readyState === 1) {
-            ws.send(data);
+            try {
+              // Convert stderr data to JSON format
+              ws.send(JSON.stringify({
+                type: 'data',
+                data: stderr
+              }));
+            } catch (error) {
+              logger.error(`Error sending stderr data: ${error.message}`);
+              // Fallback to sending raw data if JSON conversion fails
+              ws.send(data);
+            }
           }
         });
 

@@ -78,6 +78,8 @@ const BasicTerminal = ({
           // First try: with protocol array
           try {
             ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
+            // Set binary type to blob for better handling
+            ws.binaryType = 'blob';
             websocketRef.current = ws;
             addOutput('info', 'WebSocket created with session protocol (array format)');
           } catch (protocolError) {
@@ -87,6 +89,8 @@ const BasicTerminal = ({
             try {
               console.log('Trying with string protocol');
               ws = new WebSocket(wsUrl, `sessionId.${sessionId}`);
+              // Set binary type to blob for better handling
+              ws.binaryType = 'blob';
               websocketRef.current = ws;
               addOutput('info', 'WebSocket created with session protocol (string format)');
             } catch (stringProtocolError) {
@@ -100,6 +104,8 @@ const BasicTerminal = ({
                 `${wsUrl}?sessionId=${sessionId}`;
 
               ws = new WebSocket(urlWithSession);
+              // Set binary type to blob for better handling
+              ws.binaryType = 'blob';
               websocketRef.current = ws;
               addOutput('info', 'WebSocket created without protocol (using URL parameter)');
             }
@@ -112,6 +118,8 @@ const BasicTerminal = ({
           try {
             console.log('Trying to create WebSocket without protocol');
             ws = new WebSocket(wsUrl);
+            // Set binary type to blob for better handling
+            ws.binaryType = 'blob';
             websocketRef.current = ws;
             addOutput('warning', 'Created WebSocket without protocol - authentication may fail');
 
@@ -246,6 +254,28 @@ const BasicTerminal = ({
 
       ws.onmessage = (event) => {
         try {
+          // Check if the data is a Blob
+          if (event.data instanceof Blob) {
+            // Handle binary data
+            const reader = new FileReader();
+            reader.onload = () => {
+              try {
+                // Convert ArrayBuffer to string
+                const text = new TextDecoder('utf-8').decode(reader.result);
+                addOutput('output', text);
+              } catch (blobError) {
+                console.error('Error processing binary data:', blobError);
+                addOutput('error', `Error processing binary data: ${blobError.message}`);
+              }
+            };
+            reader.onerror = (fileError) => {
+              console.error('Error reading blob:', fileError);
+              addOutput('error', 'Error reading binary data');
+            };
+            reader.readAsArrayBuffer(event.data);
+            return;
+          }
+
           // Try to parse as JSON
           try {
             const data = JSON.parse(event.data);
@@ -264,8 +294,13 @@ const BasicTerminal = ({
               addOutput('output', JSON.stringify(data));
             }
           } catch (e) {
-            // Not JSON, treat as raw data
-            addOutput('output', event.data);
+            // Not JSON, treat as raw data (but ensure it's a string)
+            if (typeof event.data === 'string') {
+              addOutput('output', event.data);
+            } else {
+              console.warn('Received non-string, non-blob data:', typeof event.data);
+              addOutput('output', String(event.data));
+            }
           }
         } catch (e) {
           console.error('Error processing message:', e);
@@ -482,6 +517,21 @@ const BasicTerminal = ({
 
   // Add output to terminal
   const addOutput = (type, text) => {
+    // Check if text is a valid React child
+    if (text instanceof Blob || text instanceof ArrayBuffer) {
+      console.error('Invalid React child: Received binary data instead of string', text);
+      // Convert to string representation
+      text = `[Binary data: ${text.size || text.byteLength} bytes]`;
+    } else if (typeof text !== 'string' && typeof text !== 'number') {
+      console.warn('Non-string output:', typeof text, text);
+      // Convert to string
+      try {
+        text = String(text);
+      } catch (e) {
+        text = '[Object]';
+      }
+    }
+
     setOutput(prev => [...prev, { type, text }]);
   };
 
