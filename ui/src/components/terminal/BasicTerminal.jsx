@@ -332,13 +332,26 @@ const BasicTerminal = ({
           // Try to parse as JSON
           try {
             const data = JSON.parse(event.data);
-            console.log('Parsed JSON data:', data);
+            console.log('%c Parsed JSON data:', 'background: #4CAF50; color: white; padding: 2px 5px; border-radius: 2px;', data);
 
             // Handle different message types
             if (data.type === 'data') {
               // Regular data message
-              console.log('Received data message:', data.data);
+              console.log('%c Received data message:', 'background: #2196F3; color: white; padding: 2px 5px; border-radius: 2px;', data.data);
+
+              // Log to document for debugging
+              document.title = `Got data: ${data.data.length} bytes`;
+
+              // Add to terminal output
               addOutput('output', data.data);
+
+              // Force UI update
+              setTimeout(() => {
+                if (terminalRef.current) {
+                  terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+                  console.log('Forced scroll after data');
+                }
+              }, 10);
             } else if (data.type === 'pong') {
               // Pong response from server
               console.log('Received pong from server', data.timestamp);
@@ -346,7 +359,7 @@ const BasicTerminal = ({
               websocketRef.current.lastPongTime = Date.now();
             } else {
               // Unknown message type
-              console.log('Unknown message type:', data.type);
+              console.log('%c Unknown message type:', 'background: #FF9800; color: white; padding: 2px 5px; border-radius: 2px;', data.type);
               addOutput('output', JSON.stringify(data));
             }
           } catch (e) {

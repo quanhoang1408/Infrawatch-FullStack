@@ -165,6 +165,7 @@ class OpenSSHSessionService {
         '-o', 'ServerAliveInterval=30', // Keep connection alive
         '-o', 'ServerAliveCountMax=3', // Number of alive messages without response
         '-o', 'ConnectTimeout=30', // Connection timeout in seconds
+        '-o', 'SendEnv=TERM', // Send terminal environment
         '-t', // Force pseudo-terminal allocation
         `${sessionData.sshUser}@${sessionData.targetIp}`
       ];
@@ -182,8 +183,41 @@ class OpenSSHSessionService {
 
       // If node-pty is not available, use regular child_process
       const sshProcess = ptyProcess || spawn('ssh', sshArgs, {
-        env: { ...process.env, TERM: 'xterm-256color' },
-        stdio: ['pipe', 'pipe', 'pipe']
+        env: {
+          ...process.env,
+          TERM: 'xterm-256color',
+          FORCE_COLOR: '1', // Force color output
+          COLORTERM: 'truecolor' // Enable true color support
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false // Don't use shell to avoid issues with output
+      });
+
+      // Check if process started successfully
+      if (!sshProcess || !sshProcess.pid) {
+        const error = new Error('Failed to start SSH process');
+        logger.error(error.message);
+        throw error;
+      }
+
+      // Log process details
+      logger.info(`SSH process started with PID: ${sshProcess.pid}`);
+      logger.info('Waiting for initial output from SSH process...');
+
+      // Set up error handler for the process itself
+      sshProcess.on('error', (error) => {
+        logger.error(`SSH process error: ${error.message}`);
+        // Try to send error to client
+        if (ws.readyState === 1) {
+          try {
+            ws.send(JSON.stringify({
+              type: 'data',
+              data: `\r\nSSH process error: ${error.message}\r\n`
+            }));
+          } catch (wsError) {
+            logger.error(`Failed to send process error to WebSocket: ${wsError.message}`);
+          }
+        }
       });
 
       // Log whether we're using pty or regular process
@@ -193,8 +227,30 @@ class OpenSSHSessionService {
       const writeToProcess = (data) => {
         if (ptyProcess) {
           ptyProcess.write(data);
+          logger.debug(`Data written to pty process: ${data.toString().replace(/\r/g, '\\r').replace(/\n/g, '\\n')}`);
         } else if (sshProcess.stdin && sshProcess.stdin.writable) {
-          sshProcess.stdin.write(data);
+          const result = sshProcess.stdin.write(data);
+          logger.debug(`Data written to SSH process stdin: ${data.toString().replace(/\r/g, '\\r').replace(/\n/g, '\\n')}`);
+          logger.debug(`Write result: ${result}`);
+
+          // If buffer is full, wait for drain event
+          if (!result) {
+            logger.warn('SSH process stdin buffer is full, waiting for drain');
+            sshProcess.stdin.once('drain', () => {
+              logger.debug('SSH process stdin drained, can write more data');
+            });
+          }
+        } else {
+          logger.error('Cannot write to SSH process: stdin not available or not writable');
+          // Try to send error message to client
+          try {
+            ws.send(JSON.stringify({
+              type: 'data',
+              data: '\r\nError: Cannot write to SSH process (stdin not available)\r\n'
+            }));
+          } catch (wsError) {
+            logger.error(`Failed to send error to WebSocket: ${wsError.message}`);
+          }
         }
       };
 
@@ -205,6 +261,16 @@ class OpenSSHSessionService {
         keyPath: sessionData.keyPath,
         certPath: sessionData.certPath
       });
+
+      // Send a test command to verify the connection is working
+      setTimeout(() => {
+        try {
+          logger.info('Sending test echo command to verify SSH connection');
+          writeToProcess(Buffer.from('echo "SSH connection test successful"\r'));
+        } catch (testError) {
+          logger.error(`Error sending test command: ${testError.message}`);
+        }
+      }, 2000); // Wait 2 seconds before sending test command
 
       // Set up data handling based on whether we're using pty or regular process
       if (ptyProcess) {
@@ -233,26 +299,42 @@ class OpenSSHSessionService {
       } else {
         // Handle SSH process stdout
         sshProcess.stdout.on('data', (data) => {
+          // Always log stdout data regardless of WebSocket state
+          const dataStr = data.toString('utf8');
+          logger.info(`SSH stdout data received (${dataStr.length} bytes): ${dataStr.substring(0, 100)}${dataStr.length > 100 ? '...' : ''}`);
+
           if (ws.readyState === 1) { // WebSocket.OPEN
             try {
-              // Log the data being received from the SSH process
-              const dataStr = data.toString('utf8');
-              logger.debug(`SSH stdout data (${dataStr.length} bytes): ${dataStr.substring(0, 100)}${dataStr.length > 100 ? '...' : ''}`);
-
               // Convert binary data to JSON format to avoid Blob rendering issues
               const jsonData = JSON.stringify({
                 type: 'data',
                 data: dataStr
               });
 
-              logger.debug(`Sending JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
+              logger.info(`Sending JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
               ws.send(jsonData);
-              logger.debug('Data sent to client successfully');
+              logger.info('Data sent to client successfully');
+
+              // Force a small delay to ensure data is processed properly
+              setTimeout(() => {
+                try {
+                  // Send a small ping to ensure connection is still active
+                  ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                  logger.debug('Sent ping after data to verify connection');
+                } catch (pingError) {
+                  logger.error(`Error sending verification ping: ${pingError.message}`);
+                }
+              }, 50);
             } catch (error) {
               logger.error(`Error sending stdout data: ${error.message}`);
               // Fallback to sending raw data if JSON conversion fails
-              logger.debug('Falling back to sending raw data');
-              ws.send(data);
+              logger.info('Falling back to sending raw data');
+              try {
+                ws.send(data);
+                logger.info('Raw data sent successfully');
+              } catch (rawError) {
+                logger.error(`Error sending raw data: ${rawError.message}`);
+              }
             }
           } else {
             logger.warn(`Cannot send stdout data: WebSocket not open (readyState: ${ws.readyState})`);
