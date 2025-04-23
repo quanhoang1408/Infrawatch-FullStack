@@ -1,6 +1,17 @@
 const WebSocket = require('ws');
 const sshSessionService = require('../services/ssh-session.service');
+const openSSHSessionService = require('../services/openssh-session.service');
 const logger = require('../utils/logger');
+
+// Use OpenSSH service instead of SSH2 library
+const useOpenSSH = process.env.USE_OPENSSH === 'true';
+const sshService = useOpenSSH ? openSSHSessionService : sshSessionService;
+
+if (useOpenSSH) {
+  logger.info('Using OpenSSH for SSH connections');
+} else {
+  logger.info('Using SSH2 library for SSH connections');
+}
 
 function setupWSServer(server) {
   const wss = new WebSocket.Server({
@@ -58,7 +69,7 @@ function setupWSServer(server) {
             if (message.type === 'auth' && message.sessionId) {
               sessionId = message.sessionId;
               logger.info(`WebSocket connection authenticated for session ${sessionId}`);
-              sshSessionService.handleWebSocketConnection(ws, sessionId);
+              sshService.handleWebSocketConnection(ws, sessionId);
             } else {
               logger.warn('Invalid authentication message');
               ws.close(4001, 'Authentication required');
@@ -78,14 +89,14 @@ function setupWSServer(server) {
         }, 5000);
       } else {
         logger.info(`WebSocket connection established for session ${sessionId}`);
-        sshSessionService.handleWebSocketConnection(ws, sessionId);
+        sshService.handleWebSocketConnection(ws, sessionId);
       }
 
       // Handle WebSocket close
       ws.on('close', (code, reason) => {
         if (sessionId) {
           logger.info(`WebSocket connection closed for session ${sessionId}: ${code} ${reason || 'No reason'}`);
-          sshSessionService.terminateSession(sessionId);
+          sshService.terminateSession(sessionId);
         }
       });
 
