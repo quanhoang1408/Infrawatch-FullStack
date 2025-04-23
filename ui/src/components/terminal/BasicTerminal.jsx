@@ -48,9 +48,42 @@ const BasicTerminal = ({
       console.log('Connecting to WebSocket:', wsUrl);
       addOutput('info', `Connecting to ${wsUrl}...`);
 
-      // Create WebSocket
-      const ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
-      websocketRef.current = ws;
+      // Create WebSocket with better error handling
+      let ws;
+      try {
+        console.log(`Creating WebSocket connection to ${wsUrl} with protocol sessionId.${sessionId}`);
+        addOutput('info', `Creating WebSocket connection with protocol sessionId.${sessionId}`);
+
+        // Create WebSocket with the session ID as the protocol
+        ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
+        websocketRef.current = ws;
+
+        // Add a timeout to detect connection issues
+        const connectionTimeout = setTimeout(() => {
+          if (ws.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket connection timeout');
+            addOutput('error', 'Connection timeout - WebSocket failed to connect within 30 seconds');
+            setError('Connection timeout');
+            setConnecting(false);
+
+            // Close the socket if it's still connecting
+            if (ws.readyState === WebSocket.CONNECTING) {
+              ws.close();
+            }
+          }
+        }, 30000); // 30 second timeout
+
+        // Clear the timeout when connected
+        ws.addEventListener('open', () => {
+          clearTimeout(connectionTimeout);
+        });
+      } catch (wsError) {
+        console.error('Error creating WebSocket:', wsError);
+        addOutput('error', `Error creating WebSocket: ${wsError.message}`);
+        setError(`WebSocket creation error: ${wsError.message}`);
+        setConnecting(false);
+        return;
+      }
 
       // Handle WebSocket events
       ws.onopen = () => {
@@ -65,6 +98,21 @@ const BasicTerminal = ({
         if (handleKeyDownRef.current) {
           document.addEventListener('keydown', handleKeyDownRef.current);
         }
+
+        // Set up heartbeat to keep connection alive
+        const heartbeatInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            // Send a ping message
+            ws.send(JSON.stringify({ type: 'ping' }));
+            console.log('Sent heartbeat ping');
+          } else {
+            // Clear interval if connection is closed
+            clearInterval(heartbeatInterval);
+          }
+        }, 15000); // Send heartbeat every 15 seconds
+
+        // Store interval ID for cleanup
+        websocketRef.current.heartbeatInterval = heartbeatInterval;
       };
 
       ws.onmessage = (event) => {
@@ -72,9 +120,18 @@ const BasicTerminal = ({
           // Try to parse as JSON
           try {
             const data = JSON.parse(event.data);
+
+            // Handle different message types
             if (data.type === 'data') {
+              // Regular data message
               addOutput('output', data.data);
+            } else if (data.type === 'pong') {
+              // Pong response from server
+              console.log('Received pong from server', data.timestamp);
+              // Update last pong timestamp
+              websocketRef.current.lastPongTime = Date.now();
             } else {
+              // Unknown message type
               addOutput('output', JSON.stringify(data));
             }
           } catch (e) {
@@ -89,21 +146,112 @@ const BasicTerminal = ({
 
       ws.onerror = (event) => {
         console.error('WebSocket error:', event);
-        setError('WebSocket connection error');
+
+        // Get more detailed error information if possible
+        let errorMessage = 'WebSocket connection error';
+
+        // Try to extract more information from the event
+        if (event.message) {
+          errorMessage += `: ${event.message}`;
+        } else if (event.error) {
+          errorMessage += `: ${event.error.message || event.error}`;
+        }
+
+        // Log detailed error information
+        console.error('WebSocket error details:', {
+          errorMessage,
+          wsUrl: onConnect?.(vmId, sessionId),
+          readyState: ws.readyState,
+          protocol: ws.protocol,
+          extensions: ws.extensions,
+          event
+        });
+
+        setError(errorMessage);
         setConnected(false);
         setConnecting(false);
-        addOutput('error', 'Connection error');
+        addOutput('error', `Connection error: ${errorMessage}`);
+
+        // Try to provide more helpful information based on the error
+        if (wsUrl.startsWith('wss:') && window.location.protocol === 'http:') {
+          addOutput('warning', 'You are trying to connect to a secure WebSocket (wss:) from an insecure page (http:). This may be blocked by your browser.');
+          addOutput('info', 'Try accessing this page via HTTPS instead.');
+        }
       };
 
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
         setConnected(false);
-        addOutput('warning', `Connection closed (${event.code}): ${event.reason || 'Unknown reason'}`);
-        onDisconnect?.(vmId, sessionId, event.reason);
+
+        // Provide more helpful information based on the close code
+        let closeReason = event.reason || 'Unknown reason';
+        let closeType = 'warning';
+
+        // Interpret common close codes
+        switch (event.code) {
+          case 1000:
+            closeReason = 'Normal closure: ' + closeReason;
+            closeType = 'info';
+            break;
+          case 1001:
+            closeReason = 'Server going down: ' + closeReason;
+            break;
+          case 1002:
+            closeReason = 'Protocol error: ' + closeReason;
+            break;
+          case 1003:
+            closeReason = 'Received invalid data: ' + closeReason;
+            break;
+          case 1005:
+            closeReason = 'No status code was provided';
+            break;
+          case 1006:
+            closeReason = 'Abnormal closure - connection was closed unexpectedly';
+            // Add more detailed debugging for abnormal closures
+            console.error('Abnormal WebSocket closure details:', {
+              wsUrl: onConnect?.(vmId, sessionId),
+              readyState: ws.readyState,
+              protocol: ws.protocol,
+              extensions: ws.extensions
+            });
+            addOutput('error', 'Connection was closed unexpectedly. This could be due to network issues or server problems.');
+            if (wsUrl.startsWith('wss:')) {
+              addOutput('info', 'Check if your network allows secure WebSocket connections (wss:).');
+            }
+            break;
+          case 1007:
+            closeReason = 'Invalid frame payload data: ' + closeReason;
+            break;
+          case 1008:
+            closeReason = 'Policy violation: ' + closeReason;
+            break;
+          case 1009:
+            closeReason = 'Message too big: ' + closeReason;
+            break;
+          case 1010:
+            closeReason = 'Missing extension: ' + closeReason;
+            break;
+          case 1011:
+            closeReason = 'Internal server error: ' + closeReason;
+            break;
+          case 1015:
+            closeReason = 'TLS handshake failed';
+            break;
+          default:
+            closeReason = `Connection closed (${event.code}): ${closeReason}`;
+        }
+
+        addOutput(closeType, closeReason);
+        onDisconnect?.(vmId, sessionId, closeReason);
 
         // Remove keyboard event listener when connection is closed
         if (handleKeyDownRef.current) {
           document.removeEventListener('keydown', handleKeyDownRef.current);
+        }
+
+        // If this was an abnormal closure and we were connected, suggest reconnecting
+        if (event.code === 1006 && connected) {
+          addOutput('info', 'You can try reconnecting by clicking the Connect button above.');
         }
       };
     } catch (e) {
@@ -188,6 +336,13 @@ const BasicTerminal = ({
     return () => {
       try {
         if (websocketRef.current) {
+          // Clear heartbeat interval if it exists
+          if (websocketRef.current.heartbeatInterval) {
+            clearInterval(websocketRef.current.heartbeatInterval);
+            console.log('Cleared heartbeat interval');
+          }
+
+          // Close WebSocket connection
           websocketRef.current.close();
           websocketRef.current = null;
         }

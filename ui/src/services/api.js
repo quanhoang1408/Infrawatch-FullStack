@@ -32,15 +32,26 @@ const api = axios.create({
 // Log all requests in development
 if (process.env.NODE_ENV === 'development') {
   axios.interceptors.request.use(request => {
-    console.log('Starting Request', JSON.stringify(request, null, 2));
+    console.log('Starting Request', request.method, request.url);
+    console.log('Request Headers:', request.headers);
     return request;
   });
 
   axios.interceptors.response.use(response => {
-    console.log('Response:', JSON.stringify(response.data, null, 2));
+    console.log('Response:', response.status, response.statusText);
     return response;
   }, error => {
-    console.error('Response Error:', error);
+    console.error('Response Error:', error.message);
+    if (error.response) {
+      console.error('Error Status:', error.response.status);
+      console.error('Error Headers:', error.response.headers);
+      console.error('Error Data:', error.response.data);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
+    console.error('Error Config:', error.config);
     return Promise.reject(error);
   });
 }

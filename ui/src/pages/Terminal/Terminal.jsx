@@ -146,15 +146,29 @@ const Terminal = () => {
     // Determine the WebSocket URL based on environment
     let wsUrl;
 
-    // Use secure WebSocket for production, regular for localhost
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Always use secure WebSocket (wss:) when connecting to api.infrawatch.website
+    // Use protocol based on current page for other hosts
+    let wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
     // Use the API domain for WebSocket connection
-    // For local development, connect to the deployed API
+    // For local development, connect to the remote server
     const wsHost = window.location.hostname === 'localhost' ? 'api.infrawatch.website' : window.location.host;
+
+    // Force wss: for api.infrawatch.website
+    if (wsHost === 'api.infrawatch.website') {
+      wsProtocol = 'wss:';
+    }
 
     // Construct the WebSocket URL
     wsUrl = `${wsProtocol}//${wsHost}/ws-ssh`;
+
+    // Add debug information
+    console.log('WebSocket configuration:', {
+      currentProtocol: window.location.protocol,
+      wsProtocol,
+      wsHost,
+      wsUrl
+    });
 
     // Log connection attempt for debugging
     console.log('Connecting to WebSocket:', {

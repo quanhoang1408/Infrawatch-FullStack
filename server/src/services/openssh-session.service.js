@@ -285,7 +285,21 @@ class OpenSSHSessionService {
 
       // Handle WebSocket messages (user input)
       ws.on('message', (data) => {
-        writeToProcess(data);
+        try {
+          // Check if it's a JSON message (like ping/pong)
+          const jsonData = JSON.parse(data.toString());
+          if (jsonData.type === 'ping') {
+            // Handle ping message
+            if (ws.readyState === 1) { // WebSocket.OPEN
+              ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+              logger.debug('Sent pong response to client');
+            }
+            return;
+          }
+        } catch (e) {
+          // Not JSON, treat as regular input data
+          writeToProcess(data);
+        }
       });
 
       // Handle WebSocket close

@@ -104,6 +104,26 @@ function setupWSServer(server) {
       ws.on('error', (error) => {
         logger.error(`WebSocket error${sessionId ? ` for session ${sessionId}` : ''}:`, error);
       });
+
+      // Handle WebSocket messages for ping/pong
+      ws.on('message', (data) => {
+        try {
+          // Try to parse as JSON
+          const message = JSON.parse(data.toString());
+
+          // Handle ping messages
+          if (message.type === 'ping') {
+            logger.debug(`Received ping from client${sessionId ? ` (session ${sessionId})` : ''}`);
+            // Send pong response
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+              logger.debug(`Sent pong to client${sessionId ? ` (session ${sessionId})` : ''}`);
+            }
+          }
+        } catch (e) {
+          // Not JSON or other error, ignore (probably binary data for SSH)
+        }
+      });
     } catch (error) {
       logger.error('Error handling WebSocket connection:', error);
       ws.close(4000, 'Internal server error');
