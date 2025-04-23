@@ -30,26 +30,37 @@ function setupWSServer(server) {
     },
     // Handle protocol for session authentication
     handleProtocols: (protocols, request) => {
-      logger.info(`WebSocket protocols received: ${protocols}`);
+      try {
+        // Convert protocols to array if it's not already
+        const protocolArray = Array.isArray(protocols) ? protocols :
+                             (protocols instanceof Set) ? Array.from(protocols) :
+                             (typeof protocols === 'string') ? [protocols] : [];
 
-      if (!protocols || !protocols.length) {
-        logger.warn('No protocols provided in WebSocket request');
-        // Accept the connection anyway - we'll authenticate via message
+        logger.info(`WebSocket protocols received: ${JSON.stringify(protocolArray)}`);
+
+        if (!protocolArray.length) {
+          logger.warn('No protocols provided in WebSocket request');
+          // Accept the connection anyway - we'll authenticate via message
+          return true;
+        }
+
+        // Look for sessionId protocol
+        for (const protocol of protocolArray) {
+          if (typeof protocol === 'string' && protocol.startsWith('sessionId.')) {
+            logger.info(`Found valid session protocol: ${protocol}`);
+            return protocol;
+          }
+        }
+
+        // If no valid protocol found, accept the connection anyway
+        // We'll handle authentication via message
+        logger.warn('No valid session protocol found, accepting connection for message-based auth');
+        return true; // Accept the connection without a specific protocol
+      } catch (error) {
+        logger.error(`Error handling protocols: ${error.message}`);
+        // Accept the connection anyway in case of error
         return true;
       }
-
-      // Look for sessionId protocol
-      for (const protocol of protocols) {
-        if (protocol.startsWith('sessionId.')) {
-          logger.info(`Found valid session protocol: ${protocol}`);
-          return protocol;
-        }
-      }
-
-      // If no valid protocol found, accept the connection anyway
-      // We'll handle authentication via message
-      logger.warn('No valid session protocol found, accepting connection for message-based auth');
-      return protocols[0]; // Accept the first protocol
     }
   });
 
@@ -66,13 +77,19 @@ function setupWSServer(server) {
       })}`);
 
       // Extract session ID from multiple sources
-      const protocol = ws.protocol;
       let sessionId;
 
       // Try to get session ID from protocol
-      if (protocol && protocol.startsWith('sessionId.')) {
-        sessionId = protocol.split('.')[1];
-        logger.info(`Extracted session ID from protocol: ${sessionId}`);
+      try {
+        const protocol = ws.protocol;
+        logger.debug(`WebSocket protocol: ${typeof protocol} ${protocol}`);
+
+        if (protocol && typeof protocol === 'string' && protocol.startsWith('sessionId.')) {
+          sessionId = protocol.split('.')[1];
+          logger.info(`Extracted session ID from protocol: ${sessionId}`);
+        }
+      } catch (error) {
+        logger.error(`Error extracting session ID from protocol: ${error.message}`);
       }
 
       // If not found, try from header
@@ -92,10 +109,20 @@ function setupWSServer(server) {
 
       // If still not found, try from URL query parameters
       if (!sessionId) {
-        const url = new URL(req.url, `http://${req.headers.host}`);
-        sessionId = url.searchParams.get('sessionId');
-        if (sessionId) {
-          logger.info(`Extracted session ID from URL query parameter: ${sessionId}`);
+        try {
+          logger.debug(`Request URL: ${req.url}`);
+
+          // Parse URL and query parameters manually to avoid URL parsing issues
+          const urlParts = req.url.split('?');
+          if (urlParts.length > 1) {
+            const queryParams = new URLSearchParams(urlParts[1]);
+            sessionId = queryParams.get('sessionId');
+            if (sessionId) {
+              logger.info(`Extracted session ID from URL query parameter: ${sessionId}`);
+            }
+          }
+        } catch (error) {
+          logger.error(`Error extracting session ID from URL: ${error.message}`);
         }
       }
 
@@ -125,7 +152,7 @@ function setupWSServer(server) {
             logger.warn('Authentication timeout');
             ws.close(4000, 'Authentication timeout');
           }
-        }, 5000);
+        }, 15000); // Increased timeout to 15 seconds
       } else {
         logger.info(`WebSocket connection established for session ${sessionId}`);
         sshService.handleWebSocketConnection(ws, sessionId, req);
@@ -160,13 +187,17 @@ function setupWSServer(server) {
             }
           }
           // Handle auth messages (for connections without protocol)
-          else if (message.type === 'auth' && message.sessionId && !sessionId) {
-            // Set the session ID from the auth message
-            sessionId = message.sessionId;
-            logger.info(`WebSocket authenticated via message for session ${sessionId}`);
+          else if (message.type === 'auth' && message.sessionId) {
+            if (!sessionId) {
+              // Set the session ID from the auth message
+              sessionId = message.sessionId;
+              logger.info(`WebSocket authenticated via message for session ${sessionId}`);
 
-            // Handle the connection with the session ID
-            sshService.handleWebSocketConnection(ws, sessionId);
+              // Handle the connection with the session ID
+              sshService.handleWebSocketConnection(ws, sessionId, req);
+            } else {
+              logger.info(`Received duplicate auth message for session ${sessionId}, ignoring`);
+            }
           }
           // Handle other message types
           else if (message.type) {

@@ -74,9 +74,36 @@ const BasicTerminal = ({
 
           // Create WebSocket with protocol
           console.log('Creating WebSocket with protocol:', [`sessionId.${sessionId}`]);
-          ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
-          websocketRef.current = ws;
-          addOutput('info', 'WebSocket created with session protocol');
+
+          // First try: with protocol array
+          try {
+            ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
+            websocketRef.current = ws;
+            addOutput('info', 'WebSocket created with session protocol (array format)');
+          } catch (protocolError) {
+            console.error('Error creating WebSocket with protocol array:', protocolError);
+
+            // Second try: with string protocol
+            try {
+              console.log('Trying with string protocol');
+              ws = new WebSocket(wsUrl, `sessionId.${sessionId}`);
+              websocketRef.current = ws;
+              addOutput('info', 'WebSocket created with session protocol (string format)');
+            } catch (stringProtocolError) {
+              console.error('Error creating WebSocket with string protocol:', stringProtocolError);
+
+              // Third try: without protocol, using URL parameter only
+              console.log('Falling back to URL parameter only');
+              // Make sure the URL has the sessionId parameter
+              const urlWithSession = wsUrl.includes('?') ?
+                (wsUrl.includes('sessionId=') ? wsUrl : `${wsUrl}&sessionId=${sessionId}`) :
+                `${wsUrl}?sessionId=${sessionId}`;
+
+              ws = new WebSocket(urlWithSession);
+              websocketRef.current = ws;
+              addOutput('info', 'WebSocket created without protocol (using URL parameter)');
+            }
+          }
         } catch (error) {
           console.error('Error creating WebSocket object:', error);
           addOutput('error', `Error creating WebSocket object: ${error.message}`);
@@ -153,6 +180,17 @@ const BasicTerminal = ({
         // Add keyboard event listener after connection is established
         if (handleKeyDownRef.current) {
           document.addEventListener('keydown', handleKeyDownRef.current);
+        }
+
+        // Send authentication message as a backup method
+        try {
+          console.log('Sending authentication message with session ID');
+          ws.send(JSON.stringify({
+            type: 'auth',
+            sessionId: sessionId
+          }));
+        } catch (authError) {
+          console.error('Error sending authentication message:', authError);
         }
 
         // Set up heartbeat to keep connection alive
@@ -295,6 +333,15 @@ const BasicTerminal = ({
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
         setConnected(false);
+
+        // Log detailed information about the connection
+        console.log('WebSocket close details:', {
+          url: wsUrl,
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+          timestamp: new Date().toISOString()
+        });
 
         // Provide more helpful information based on the close code
         let closeReason = event.reason || 'Unknown reason';
