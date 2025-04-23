@@ -25,6 +25,27 @@ const BasicTerminal = ({
   const [output, setOutput] = useState([
     { type: 'info', text: 'Terminal ready. Click Connect to start session.' }
   ]);
+  const [currentInput, setCurrentInput] = useState('');
+
+  // Add output to terminal
+  const addOutput = (type, text) => {
+    // Check if text is a valid React child
+    if (text instanceof Blob || text instanceof ArrayBuffer) {
+      console.error('Invalid React child: Received binary data instead of string', text);
+      // Convert to string representation
+      text = `[Binary data: ${text.size || text.byteLength} bytes]`;
+    } else if (typeof text !== 'string' && typeof text !== 'number') {
+      console.warn('Non-string output:', typeof text, text);
+      // Convert to string
+      try {
+        text = String(text);
+      } catch (e) {
+        text = '[Object]';
+      }
+    }
+
+    setOutput(prev => [...prev, { type, text }]);
+  };
 
   // Handle connection
   const handleConnect = () => {
@@ -277,6 +298,14 @@ const BasicTerminal = ({
 
       ws.onmessage = (event) => {
         try {
+          // Log all received data for debugging
+          console.log('WebSocket received data:', {
+            type: typeof event.data,
+            isBlob: event.data instanceof Blob,
+            length: event.data.length || (event.data.size ? event.data.size : 'unknown'),
+            preview: typeof event.data === 'string' ? event.data.substring(0, 100) : 'non-string data'
+          });
+
           // Check if the data is a Blob
           if (event.data instanceof Blob) {
             // Handle binary data
@@ -285,6 +314,7 @@ const BasicTerminal = ({
               try {
                 // Convert ArrayBuffer to string
                 const text = new TextDecoder('utf-8').decode(reader.result);
+                console.log('Blob decoded to text:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
                 addOutput('output', text);
               } catch (blobError) {
                 console.error('Error processing binary data:', blobError);
@@ -302,10 +332,12 @@ const BasicTerminal = ({
           // Try to parse as JSON
           try {
             const data = JSON.parse(event.data);
+            console.log('Parsed JSON data:', data);
 
             // Handle different message types
             if (data.type === 'data') {
               // Regular data message
+              console.log('Received data message:', data.data);
               addOutput('output', data.data);
             } else if (data.type === 'pong') {
               // Pong response from server
@@ -314,11 +346,14 @@ const BasicTerminal = ({
               websocketRef.current.lastPongTime = Date.now();
             } else {
               // Unknown message type
+              console.log('Unknown message type:', data.type);
               addOutput('output', JSON.stringify(data));
             }
           } catch (e) {
             // Not JSON, treat as raw data (but ensure it's a string)
+            console.log('Failed to parse as JSON, treating as raw data:', e.message);
             if (typeof event.data === 'string') {
+              console.log('Raw string data:', event.data);
               addOutput('output', event.data);
             } else {
               console.warn('Received non-string, non-blob data:', typeof event.data);
@@ -541,6 +576,24 @@ const BasicTerminal = ({
     }
   }, [vmId, sessionId, onDisconnect]);
 
+  // Update current input line
+  const updateCurrentInput = useCallback((key) => {
+    if (key === '\r') {
+      // Enter key - submit command
+      console.log('Submitting command:', currentInput);
+      // Add the command to output
+      addOutput('command', `$ ${currentInput}`);
+      // Clear current input
+      setCurrentInput('');
+    } else if (key === '\u007F') {
+      // Backspace - remove last character
+      setCurrentInput(prev => prev.slice(0, -1));
+    } else if (key.length === 1) {
+      // Regular character - add to input
+      setCurrentInput(prev => prev + key);
+    }
+  }, [currentInput, addOutput]);
+
   // Handle key down events - memoized to avoid dependency issues
   const handleKeyDown = useCallback((event) => {
     console.log('Key pressed:', event.key, 'Connected:', connected, 'WebSocket:', !!websocketRef.current);
@@ -627,72 +680,35 @@ const BasicTerminal = ({
       if (data === '\r') {
         // Send the entire command at once
         try {
-          // Send the command followed by Enter
-          const command = currentInput + '\r';
-          websocketRef.current.send(command);
-          console.log('Sent command:', currentInput);
-        } catch (error) {
-          console.error('Error sending command:', error);
-          // Fallback to JSON format
+          // First try sending as JSON format (preferred)
           try {
-            websocketRef.current.send(JSON.stringify({
+            const jsonData = JSON.stringify({
               type: 'input',
               data: currentInput + '\r'
-            }));
+            });
+            websocketRef.current.send(jsonData);
             console.log('Sent command as JSON:', currentInput);
           } catch (jsonError) {
             console.error('Error sending command as JSON:', jsonError);
+
+            // Fallback to raw format
+            const command = currentInput + '\r';
+            websocketRef.current.send(command);
+            console.log('Sent command as raw string:', currentInput);
           }
+        } catch (error) {
+          console.error('Error sending command:', error);
         }
       }
     }
-  }, [connected, currentInput]);
+  }, [connected, currentInput, updateCurrentInput, addOutput]);
+
+  // Note: addOutput function has been moved above handleConnect to fix the reference error
 
   // Store the callback in a ref to avoid dependency cycles
   useEffect(() => {
     handleKeyDownRef.current = handleKeyDown;
   }, [handleKeyDown]);
-
-  // Current input line
-  const [currentInput, setCurrentInput] = useState('');
-
-  // Add output to terminal
-  const addOutput = (type, text) => {
-    // Check if text is a valid React child
-    if (text instanceof Blob || text instanceof ArrayBuffer) {
-      console.error('Invalid React child: Received binary data instead of string', text);
-      // Convert to string representation
-      text = `[Binary data: ${text.size || text.byteLength} bytes]`;
-    } else if (typeof text !== 'string' && typeof text !== 'number') {
-      console.warn('Non-string output:', typeof text, text);
-      // Convert to string
-      try {
-        text = String(text);
-      } catch (e) {
-        text = '[Object]';
-      }
-    }
-
-    setOutput(prev => [...prev, { type, text }]);
-  };
-
-  // Update current input line
-  const updateCurrentInput = useCallback((key) => {
-    if (key === '\r') {
-      // Enter key - submit command
-      console.log('Submitting command:', currentInput);
-      // Add the command to output
-      addOutput('command', `$ ${currentInput}`);
-      // Clear current input
-      setCurrentInput('');
-    } else if (key === '\u007F') {
-      // Backspace - remove last character
-      setCurrentInput(prev => prev.slice(0, -1));
-    } else if (key.length === 1) {
-      // Regular character - add to input
-      setCurrentInput(prev => prev + key);
-    }
-  }, [currentInput]);
 
   // Scroll to bottom when output changes
   useEffect(() => {

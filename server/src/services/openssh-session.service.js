@@ -235,37 +235,55 @@ class OpenSSHSessionService {
         sshProcess.stdout.on('data', (data) => {
           if (ws.readyState === 1) { // WebSocket.OPEN
             try {
+              // Log the data being received from the SSH process
+              const dataStr = data.toString('utf8');
+              logger.debug(`SSH stdout data (${dataStr.length} bytes): ${dataStr.substring(0, 100)}${dataStr.length > 100 ? '...' : ''}`);
+
               // Convert binary data to JSON format to avoid Blob rendering issues
-              ws.send(JSON.stringify({
+              const jsonData = JSON.stringify({
                 type: 'data',
-                data: data.toString('utf8')
-              }));
+                data: dataStr
+              });
+
+              logger.debug(`Sending JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
+              ws.send(jsonData);
+              logger.debug('Data sent to client successfully');
             } catch (error) {
               logger.error(`Error sending stdout data: ${error.message}`);
               // Fallback to sending raw data if JSON conversion fails
+              logger.debug('Falling back to sending raw data');
               ws.send(data);
             }
+          } else {
+            logger.warn(`Cannot send stdout data: WebSocket not open (readyState: ${ws.readyState})`);
           }
         });
 
         // Handle SSH process stderr
         sshProcess.stderr.on('data', (data) => {
           const stderr = data.toString();
-          logger.debug(`SSH stderr: ${stderr}`);
+          logger.debug(`SSH stderr (${stderr.length} bytes): ${stderr.substring(0, 100)}${stderr.length > 100 ? '...' : ''}`);
 
           // Send stderr to client as well
           if (ws.readyState === 1) {
             try {
               // Convert stderr data to JSON format
-              ws.send(JSON.stringify({
+              const jsonData = JSON.stringify({
                 type: 'data',
                 data: stderr
-              }));
+              });
+
+              logger.debug(`Sending stderr JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
+              ws.send(jsonData);
+              logger.debug('Stderr data sent to client successfully');
             } catch (error) {
               logger.error(`Error sending stderr data: ${error.message}`);
               // Fallback to sending raw data if JSON conversion fails
+              logger.debug('Falling back to sending raw stderr data');
               ws.send(data);
             }
+          } else {
+            logger.warn(`Cannot send stderr data: WebSocket not open (readyState: ${ws.readyState})`);
           }
         });
 
@@ -306,12 +324,18 @@ class OpenSSHSessionService {
       // Handle WebSocket messages (user input)
       ws.on('message', (data) => {
         try {
+          // Log raw message data for debugging
+          const rawData = data.toString();
+          logger.debug(`Raw WebSocket message received (${rawData.length} bytes): ${rawData.substring(0, 100)}${rawData.length > 100 ? '...' : ''}`);
+
           // First try to parse as JSON
           try {
-            const jsonData = JSON.parse(data.toString());
+            const jsonData = JSON.parse(rawData);
+            logger.debug(`Parsed message as JSON: ${JSON.stringify(jsonData).substring(0, 100)}`);
 
             if (jsonData.type === 'ping') {
               // Handle ping message
+              logger.debug('Received ping message');
               if (ws.readyState === 1) { // WebSocket.OPEN
                 ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
                 logger.debug('Sent pong response to client');
@@ -323,12 +347,15 @@ class OpenSSHSessionService {
 
               // Write the input data to the SSH process
               if (jsonData.data) {
+                logger.debug(`Writing command to SSH process: ${jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
                 writeToProcess(Buffer.from(jsonData.data));
+                logger.debug('Command written to SSH process successfully');
               }
               return;
             }
           } catch (jsonError) {
             // Not JSON, handle as raw data
+            logger.debug(`Not valid JSON, handling as raw data: ${jsonError.message}`);
           }
 
           // Handle as raw data
@@ -336,20 +363,24 @@ class OpenSSHSessionService {
             const dataStr = data.toString();
             // Log the command (but not every keystroke)
             if (dataStr.includes('\r')) {
-              logger.info(`Received command: ${dataStr.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
+              logger.info(`Received raw command: ${dataStr.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
             } else {
-              logger.debug(`Received data: ${dataStr.length} bytes`);
+              logger.debug(`Received raw data: ${dataStr.length} bytes`);
             }
 
             // Write to the SSH process
+            logger.debug(`Writing raw data to SSH process: ${dataStr.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
             writeToProcess(data);
+            logger.debug('Raw data written to SSH process successfully');
             return;
           }
         } catch (e) {
           logger.error(`Error handling message: ${e.message}`);
           // Try one last time to write the data
           try {
+            logger.debug('Attempting last-resort write to process');
             writeToProcess(data);
+            logger.debug('Last-resort write successful');
           } catch (writeError) {
             logger.error(`Failed to write to process: ${writeError.message}`);
           }
