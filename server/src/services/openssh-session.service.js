@@ -172,9 +172,31 @@ class OpenSSHSessionService {
       logger.info(`SSH command: ssh ${sshArgs.join(' ')}`);
 
       // Spawn SSH process with pseudo-terminal allocation
-      const sshProcess = spawn('ssh', sshArgs, {
+      // Use the -tt option to force pseudo-terminal allocation even when stdin is not a terminal
+      sshArgs.unshift('-tt');
+
+      // We'll use regular child_process since node-pty requires compilation
+      // and may not be available in all environments
+      let ptyProcess = null;
+      logger.info('Using regular child_process for SSH connection');
+
+      // If node-pty is not available, use regular child_process
+      const sshProcess = ptyProcess || spawn('ssh', sshArgs, {
         env: { ...process.env, TERM: 'xterm-256color' },
+        stdio: ['pipe', 'pipe', 'pipe']
       });
+
+      // Log whether we're using pty or regular process
+      logger.info(`SSH process started: ${ptyProcess ? 'Using PTY' : 'Using regular process'}`);
+
+      // Define a wrapper function to handle both pty and regular process
+      const writeToProcess = (data) => {
+        if (ptyProcess) {
+          ptyProcess.write(data);
+        } else if (sshProcess.stdin && sshProcess.stdin.writable) {
+          sshProcess.stdin.write(data);
+        }
+      };
 
       // Store process for cleanup
       this.activeSessions.set(sessionId, {
@@ -184,62 +206,86 @@ class OpenSSHSessionService {
         certPath: sessionData.certPath
       });
 
-      // Handle SSH process stdout
-      sshProcess.stdout.on('data', (data) => {
-        if (ws.readyState === 1) { // WebSocket.OPEN
-          ws.send(data);
-        }
-      });
+      // Set up data handling based on whether we're using pty or regular process
+      if (ptyProcess) {
+        // Handle pty data (combines stdout and stderr)
+        ptyProcess.onData((data) => {
+          if (ws.readyState === 1) { // WebSocket.OPEN
+            ws.send(Buffer.from(data));
+          }
+        });
 
-      // Handle SSH process stderr
-      sshProcess.stderr.on('data', (data) => {
-        const stderr = data.toString();
-        logger.debug(`SSH stderr: ${stderr}`);
+        // Handle pty exit
+        ptyProcess.onExit(({ exitCode, signal }) => {
+          logger.info(`SSH process exited with code ${exitCode} and signal ${signal}`);
 
-        // Send stderr to client as well
-        if (ws.readyState === 1) {
-          ws.send(data);
-        }
-      });
+          // Clean up key files
+          this.cleanupSessionFiles(sessionData);
 
-      // Handle SSH process exit
-      sshProcess.on('exit', (code, signal) => {
-        logger.info(`SSH process exited with code ${code} and signal ${signal}`);
+          // Close WebSocket if it's still open
+          if (ws.readyState === 1) {
+            ws.close(1000, `SSH process exited with code ${exitCode}`);
+          }
 
-        // Clean up key files
-        this.cleanupSessionFiles(sessionData);
+          // Remove from active sessions
+          this.activeSessions.delete(sessionId);
+        });
+      } else {
+        // Handle SSH process stdout
+        sshProcess.stdout.on('data', (data) => {
+          if (ws.readyState === 1) { // WebSocket.OPEN
+            ws.send(data);
+          }
+        });
 
-        // Close WebSocket if it's still open
-        if (ws.readyState === 1) {
-          ws.close(1000, `SSH process exited with code ${code}`);
-        }
+        // Handle SSH process stderr
+        sshProcess.stderr.on('data', (data) => {
+          const stderr = data.toString();
+          logger.debug(`SSH stderr: ${stderr}`);
 
-        // Remove from active sessions
-        this.activeSessions.delete(sessionId);
-      });
+          // Send stderr to client as well
+          if (ws.readyState === 1) {
+            ws.send(data);
+          }
+        });
 
-      // Handle SSH process error
-      sshProcess.on('error', (error) => {
-        logger.error(`SSH process error: ${error.message}`);
+        // Handle SSH process exit
+        sshProcess.on('exit', (code, signal) => {
+          logger.info(`SSH process exited with code ${code} and signal ${signal}`);
 
-        // Send error message to client
-        if (ws.readyState === 1) {
-          ws.send(Buffer.from(`\r\nError: ${error.message}\r\n`));
-          ws.close(4002, error.message);
-        }
+          // Clean up key files
+          this.cleanupSessionFiles(sessionData);
 
-        // Clean up key files
-        this.cleanupSessionFiles(sessionData);
+          // Close WebSocket if it's still open
+          if (ws.readyState === 1) {
+            ws.close(1000, `SSH process exited with code ${code}`);
+          }
 
-        // Remove from active sessions
-        this.activeSessions.delete(sessionId);
-      });
+          // Remove from active sessions
+          this.activeSessions.delete(sessionId);
+        });
+
+        // Handle SSH process error
+        sshProcess.on('error', (error) => {
+          logger.error(`SSH process error: ${error.message}`);
+
+          // Send error message to client
+          if (ws.readyState === 1) {
+            ws.send(Buffer.from(`\r\nError: ${error.message}\r\n`));
+            ws.close(4002, error.message);
+          }
+
+          // Clean up key files
+          this.cleanupSessionFiles(sessionData);
+
+          // Remove from active sessions
+          this.activeSessions.delete(sessionId);
+        });
+      }
 
       // Handle WebSocket messages (user input)
       ws.on('message', (data) => {
-        if (sshProcess.stdin.writable) {
-          sshProcess.stdin.write(data);
-        }
+        writeToProcess(data);
       });
 
       // Handle WebSocket close
