@@ -306,8 +306,9 @@ class OpenSSHSessionService {
       // Handle WebSocket messages (user input)
       ws.on('message', (data) => {
         try {
-          // Check if it's a JSON message (like ping/pong)
+          // Check if it's a JSON message
           const jsonData = JSON.parse(data.toString());
+
           if (jsonData.type === 'ping') {
             // Handle ping message
             if (ws.readyState === 1) { // WebSocket.OPEN
@@ -315,9 +316,19 @@ class OpenSSHSessionService {
               logger.debug('Sent pong response to client');
             }
             return;
+          } else if (jsonData.type === 'input') {
+            // Handle input data from client
+            logger.debug(`Received input data: ${jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
+
+            // Write the input data to the SSH process
+            if (jsonData.data) {
+              writeToProcess(Buffer.from(jsonData.data));
+            }
+            return;
           }
         } catch (e) {
           // Not JSON, treat as regular input data
+          logger.debug(`Received non-JSON data: ${data.length} bytes`);
           writeToProcess(data);
         }
       });

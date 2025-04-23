@@ -184,10 +184,20 @@ const BasicTerminal = ({
         addOutput('success', 'Connected to terminal session');
         addOutput('info', `VM: ${vmName || 'Unknown'} (${vmId})`);
         addOutput('info', '--------------------------------------------------');
+        addOutput('info', 'Click on the terminal and start typing to interact with the VM.');
+        addOutput('info', 'Press Ctrl+C to interrupt a command, Ctrl+D to exit.');
+        addOutput('info', '--------------------------------------------------');
 
         // Add keyboard event listener after connection is established
         if (handleKeyDownRef.current) {
           document.addEventListener('keydown', handleKeyDownRef.current);
+        }
+
+        // Auto-focus the terminal
+        if (terminalRef.current) {
+          setTimeout(() => {
+            terminalRef.current.focus();
+          }, 100);
         }
 
         // Send authentication message as a backup method
@@ -492,21 +502,81 @@ const BasicTerminal = ({
 
     // Send key to server
     const key = event.key;
-    if (key.length === 1 || key === 'Enter' || key === 'Backspace' || key === 'Tab') {
+    const ctrl = event.ctrlKey;
+    const alt = event.altKey;
+
+    // Handle special keys and combinations
+    if (key.length === 1 ||
+        key === 'Enter' ||
+        key === 'Backspace' ||
+        key === 'Tab' ||
+        key === 'Escape' ||
+        key === 'Delete' ||
+        key === 'Home' ||
+        key === 'End' ||
+        key === 'PageUp' ||
+        key === 'PageDown' ||
+        key === 'ArrowUp' ||
+        key === 'ArrowDown' ||
+        key === 'ArrowLeft' ||
+        key === 'ArrowRight' ||
+        (ctrl && key.length === 1)) {
+
       event.preventDefault();
 
       let data;
-      if (key === 'Enter') {
+
+      // Handle control key combinations
+      if (ctrl && key.length === 1) {
+        // Convert to control character (ASCII control codes are 1-26)
+        const charCode = key.toUpperCase().charCodeAt(0) - 64;
+        if (charCode > 0 && charCode < 27) {
+          data = String.fromCharCode(charCode);
+        } else {
+          data = key;
+        }
+      } else if (key === 'Enter') {
         data = '\r';
       } else if (key === 'Backspace') {
-        data = '\u007F';
+        data = '\u007F'; // Delete character
+      } else if (key === 'Delete') {
+        data = '\u001b[3~'; // ANSI escape sequence for delete
       } else if (key === 'Tab') {
         data = '\t';
+      } else if (key === 'Escape') {
+        data = '\u001b'; // ESC character
+      } else if (key === 'Home') {
+        data = '\u001b[H'; // ANSI escape sequence for home
+      } else if (key === 'End') {
+        data = '\u001b[F'; // ANSI escape sequence for end
+      } else if (key === 'PageUp') {
+        data = '\u001b[5~'; // ANSI escape sequence for page up
+      } else if (key === 'PageDown') {
+        data = '\u001b[6~'; // ANSI escape sequence for page down
+      } else if (key === 'ArrowUp') {
+        data = '\u001b[A'; // ANSI escape sequence for up arrow
+      } else if (key === 'ArrowDown') {
+        data = '\u001b[B'; // ANSI escape sequence for down arrow
+      } else if (key === 'ArrowRight') {
+        data = '\u001b[C'; // ANSI escape sequence for right arrow
+      } else if (key === 'ArrowLeft') {
+        data = '\u001b[D'; // ANSI escape sequence for left arrow
       } else {
         data = key;
       }
 
-      websocketRef.current.send(data);
+      // Send data as JSON to ensure it's processed correctly
+      try {
+        websocketRef.current.send(JSON.stringify({
+          type: 'input',
+          data: data
+        }));
+        console.log('Sent key:', key);
+      } catch (error) {
+        console.error('Error sending key:', error);
+        // Fallback to sending raw data
+        websocketRef.current.send(data);
+      }
     }
   }, [connected]);
 
@@ -579,6 +649,18 @@ const BasicTerminal = ({
     }
   };
 
+  // Track if terminal is focused
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Handle focus and blur events
+  const handleTerminalFocus = () => {
+    setIsFocused(true);
+  };
+
+  const handleTerminalBlur = () => {
+    setIsFocused(false);
+  };
+
   return (
     <div className="basic-terminal">
       <div className="basic-terminal-toolbar">
@@ -607,9 +689,11 @@ const BasicTerminal = ({
       </div>
 
       <div
-        className="basic-terminal-output"
+        className={`basic-terminal-output ${isFocused ? 'focused' : ''}`}
         ref={terminalRef}
         onClick={handleTerminalClick}
+        onFocus={handleTerminalFocus}
+        onBlur={handleTerminalBlur}
         tabIndex="0"
       >
         {output.map((line, index) => (
@@ -627,7 +711,8 @@ const BasicTerminal = ({
 
       <div className="basic-terminal-status">
         {connecting && 'Connecting...'}
-        {connected && 'Connected'}
+        {connected && !isFocused && 'Click to focus terminal'}
+        {connected && isFocused && 'Terminal ready (typing...)'}
         {!connecting && !connected && 'Disconnected'}
       </div>
     </div>

@@ -8,7 +8,7 @@
   border-radius: 4px;
   overflow: hidden;
   font-family: 'Courier New', monospace;
-  
+
   .basic-terminal-toolbar {
     display: flex;
     justify-content: space-between;
@@ -16,50 +16,50 @@
     padding: 8px 12px;
     background-color: #2c2c2c;
     border-bottom: 1px solid #3c3c3c;
-    
+
     .basic-terminal-info {
       font-size: 14px;
       color: #e0e0e0;
       font-weight: 500;
     }
-    
+
     .basic-terminal-actions {
       display: flex;
       gap: 8px;
-      
+
       button {
         padding: 4px 12px;
         border-radius: 4px;
         border: none;
         cursor: pointer;
         font-size: 13px;
-        
+
         &:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
       }
-      
+
       .basic-terminal-connect-btn {
         background-color: #2c8746;
         color: white;
-        
+
         &:hover:not(:disabled) {
           background-color: #36a555;
         }
       }
-      
+
       .basic-terminal-disconnect-btn {
         background-color: #c42b1c;
         color: white;
-        
+
         &:hover {
           background-color: #d83b2a;
         }
       }
     }
   }
-  
+
   .basic-terminal-output {
     flex: 1;
     overflow-y: auto;
@@ -71,32 +71,61 @@
     white-space: pre-wrap;
     word-break: break-all;
     outline: none;
-    
+    cursor: text;
+    position: relative;
+
+    &:focus {
+      border: 1px solid rgba(138, 180, 248, 0.5);
+      outline: none;
+    }
+
+    &.focused {
+      border: 1px solid rgba(138, 180, 248, 0.8);
+      box-shadow: 0 0 5px rgba(138, 180, 248, 0.3);
+    }
+
+    &:after {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 16px;
+      background-color: #e0e0e0;
+      animation: blink 1s step-end infinite;
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
     .terminal-line {
       margin-bottom: 2px;
-      
+
       &.info {
         color: #8ab4f8;
       }
-      
+
       &.success {
         color: #81c995;
       }
-      
+
       &.warning {
         color: #fdd663;
       }
-      
+
       &.error {
         color: #f28b82;
       }
-      
+
       &.output {
         color: #e0e0e0;
       }
     }
   }
-  
+
   .basic-terminal-error {
     position: absolute;
     top: 50px;
@@ -109,7 +138,7 @@
     font-size: 13px;
     z-index: 10;
   }
-  
+
   .basic-terminal-status {
     padding: 4px 8px;
     background-color: #2c2c2c;

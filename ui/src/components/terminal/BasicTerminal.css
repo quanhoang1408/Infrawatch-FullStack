@@ -1,0 +1,146 @@
+.basic-terminal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: #000;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.basic-terminal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background-color: #222;
+  border-bottom: 1px solid #333;
+}
+
+.basic-terminal-info {
+  font-weight: bold;
+  color: #ccc;
+}
+
+.basic-terminal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.basic-terminal-connect-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.basic-terminal-connect-btn:hover {
+  background-color: #218838;
+}
+
+.basic-terminal-connect-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.basic-terminal-disconnect-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.basic-terminal-disconnect-btn:hover {
+  background-color: #c82333;
+}
+
+.basic-terminal-output {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  background-color: #000;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: text;
+  outline: none;
+  min-height: 300px;
+}
+
+.basic-terminal-output:focus {
+  border: 1px solid #007bff;
+}
+
+.basic-terminal-error {
+  padding: 8px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  margin: 8px;
+  border-radius: 4px;
+}
+
+.basic-terminal-status {
+  padding: 4px 8px;
+  background-color: #222;
+  color: #ccc;
+  font-size: 12px;
+  border-top: 1px solid #333;
+}
+
+/* Terminal line types */
+.terminal-line {
+  margin: 0;
+  padding: 0;
+}
+
+.terminal-line.output {
+  color: #fff;
+}
+
+.terminal-line.error {
+  color: #ff6b6b;
+}
+
+.terminal-line.warning {
+  color: #ffd166;
+}
+
+.terminal-line.info {
+  color: #4ecdc4;
+}
+
+.terminal-line.success {
+  color: #6bff6b;
+}
+
+/* Cursor styling */
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background-color: #fff;
+  animation: blink 1s step-end infinite;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Make sure the terminal is responsive */
+@media (max-width: 768px) {
+  .basic-terminal-output {
+    font-size: 12px;
+  }
+}
