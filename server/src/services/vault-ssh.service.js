@@ -87,6 +87,7 @@ class VaultSSHService {
       // Log the public key for debugging
       logger.info(`Signing SSH key for user ${username}`);
       logger.debug(`Public key format (first 20 chars): ${publicKey.substring(0, 20)}...`);
+      logger.debug(`Full public key: ${publicKey}`);
 
       // Format the public key if needed
       let formattedKey = publicKey;
@@ -100,6 +101,7 @@ class VaultSSHService {
         logger.warn('Key is not in OpenSSH or PEM format, attempting to fix...');
         formattedKey = `ssh-rsa ${publicKey} web-ssh-key`;
         logger.info('Added ssh-rsa prefix to key');
+        logger.debug(`Formatted key: ${formattedKey}`);
       }
 
       // Try to sign the key with Vault
@@ -118,6 +120,23 @@ class VaultSSHService {
         if (data.signed_key) {
           logger.info(`Received signed certificate from Vault: ${data.signed_key.substring(0, 20)}...`);
           logger.debug(`Certificate serial number: ${data.serial_number}`);
+          logger.debug(`Full certificate: ${data.signed_key}`);
+
+          // Validate certificate format
+          if (!data.signed_key.startsWith('ssh-rsa-cert-v01@openssh.com ')) {
+            logger.warn('Certificate does not have expected format (should start with ssh-rsa-cert-v01@openssh.com)');
+          }
+
+          // Check for any non-base64 characters that could cause parsing issues
+          const base64Regex = /^[A-Za-z0-9+/=]+$/;
+          const certParts = data.signed_key.split(' ');
+          if (certParts.length >= 2) {
+            const certData = certParts[1]; // The base64 encoded part
+            if (!base64Regex.test(certData)) {
+              logger.warn('Certificate contains non-base64 characters which may cause parsing issues');
+              logger.debug(`Certificate data part: ${certData}`);
+            }
+          }
         } else {
           logger.warn('No signed certificate received from Vault');
         }

@@ -1,10 +1,10 @@
 [Server]
 # Backend server URL (required)
-url = http://localhost:3000
+url = https://api.infrawatch.website
 # VM ID from Infrawatch (required)
-vm_id = 67f79c0402f360cda29de743
+vm_id = YOUR_VM_ID_HERE
 # Agent token for authentication (required)
-agent_token = 8539e70806dd9cdc43e389f986ae1bdb684abd0460ec243333b5930b7ffe2cb0
+agent_token = YOUR_AGENT_TOKEN_HERE
 
 [Intervals]
 # Monitoring data collection interval in seconds

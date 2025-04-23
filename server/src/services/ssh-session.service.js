@@ -225,6 +225,18 @@ class SSHSessionService {
               logger.error(`- Certificate format: ${sessionData.certificate.substring(0, 20)}...`);
             }
 
+            // Log authentication methods tried
+            logger.error('Authentication methods:');
+            logger.error(`- Private key: ${sessionData.privateKey ? 'Yes' : 'No'}`);
+            logger.error(`- Certificate: ${sessionData.certificate ? 'Yes' : 'No'}`);
+            logger.error(`- Password: ${sessionData.password ? 'Yes' : 'No'}`);
+
+            // Try to parse the error message for more details
+            if (err.message.includes('illegal base64')) {
+              logger.error('Base64 encoding error detected in key or certificate');
+              logger.error('This usually indicates a malformed certificate or private key');
+            }
+
             // Reject with detailed error
             reject(new Error(`Authentication failed for user ${sessionData.sshUser}@${sessionData.targetIp}: ${err.message}`));
           } else if (err.message.includes('connect')) {
@@ -263,6 +275,17 @@ class SSHSessionService {
         // Add more detailed authentication debugging
         conn.on('authentication', (ctx) => {
           logger.info(`Authentication method: ${ctx.method}`);
+          if (ctx.username) {
+            logger.info(`Authentication username: ${ctx.username}`);
+          }
+          if (ctx.method === 'publickey') {
+            logger.info('Public key authentication attempt');
+            if (ctx.signature) {
+              logger.info('Signature provided with public key authentication');
+            } else {
+              logger.info('No signature provided with public key authentication (initial probe)');
+            }
+          }
         });
 
         // Log the session data for debugging (excluding sensitive info)
@@ -299,9 +322,38 @@ class SSHSessionService {
           readyTimeout: 30000
         };
 
-        // Add certificate if available
-        if (sessionData.certificate) {
+        // Add certificate if available and not disabled for testing
+        const disableCertAuth = process.env.DISABLE_CERT_AUTH === 'true';
+
+        if (sessionData.certificate && !disableCertAuth) {
           connectOptions.certificate = sessionData.certificate;
+          logger.info('Using certificate-based authentication');
+          logger.debug(`Certificate full content: ${sessionData.certificate}`);
+        } else {
+          if (disableCertAuth) {
+            logger.info('Certificate authentication disabled for testing');
+          } else {
+            logger.info('Using private key authentication without certificate');
+          }
+        }
+
+        // Log full private key for debugging
+        logger.debug(`Private key full content: ${sessionData.privateKey}`);
+
+        // Try password authentication as fallback or primary method
+        const usePasswordAuth = process.env.USE_PASSWORD_AUTH === 'true';
+
+        if (sessionData.password) {
+          connectOptions.password = sessionData.password;
+
+          if (usePasswordAuth) {
+            // If password auth is forced, remove other auth methods
+            delete connectOptions.privateKey;
+            delete connectOptions.certificate;
+            logger.info('Using password-only authentication (forced by environment variable)');
+          } else {
+            logger.info('Added password as fallback authentication method');
+          }
         }
 
         // Connect with the options
