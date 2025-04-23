@@ -31,6 +31,37 @@ class VaultSSHService {
     }
   }
 
+  async getCAPublicKey() {
+    try {
+      // Try to read the CA public key
+      try {
+        const { data } = await vault.read(`${config.vault.mount}/config/ca`);
+        if (data && data.public_key) {
+          logger.info('Successfully retrieved Vault CA public key');
+          return data.public_key;
+        }
+      } catch (readError) {
+        logger.warn(`Failed to read CA public key: ${readError.message}`);
+        // If reading fails, try to set up the CA
+      }
+
+      // If we get here, either the read failed or the public key wasn't found
+      // Try to set up the CA and get the public key
+      logger.info('Setting up Vault SSH CA...');
+      return await this.setupCA();
+    } catch (error) {
+      logger.error('Failed to get Vault CA public key:', error);
+
+      // For development/testing, return a mock CA public key
+      if (process.env.NODE_ENV === 'development') {
+        logger.warn('Using mock CA public key for development');
+        return 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC3YZM2ZfFSFQkJQPEEYkQIgbRHvR2phJqc8c5hRRqtnGKFAHbGlIJiVuQFU7ELoYUgBpMdmrQQQQqXYSuDOoAZe9yZc6LDxvBzCDkmwjg7vBk4nP4jgQcfzHmWzlU6+yYBXBCLUQFwxvqCGFaRWwqGBXjfGGQHIcbLYroOUOoHvgmuQ7zzTYBmXgJFdSGPd+LSLkJQn3xGbCS2Bj5UmEJQQJIJ5HbM8Cu0QztTYFnTtYpXQVQPIA0n9HpPJQ1qexyL4Jt6MjsHLlCk6NBR9Sy+aeIYHALXyEJRdK2hg5CZpqZ0sMkJ4mOUJiuiT6TlxKvRiOQS9zBVpz4QM9PTSfDr vault-ca@infrawatch';
+      }
+
+      throw error;
+    }
+  }
+
   async createRole() {
     try {
       await vault.write(`${config.vault.mount}/roles/${config.vault.role}`, {
