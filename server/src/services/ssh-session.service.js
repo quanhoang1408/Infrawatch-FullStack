@@ -89,8 +89,39 @@ class SSHSessionService {
       const vm = await vmService.getVMById(vmId);
       if (!vm) throw new Error('VM not found');
 
-      // Generate temporary key pair
-      const { publicKey, privateKey } = this.generateKeyPair();
+      // Use existing key pair or generate temporary key pair
+      let publicKey, privateKey;
+
+      // Check if we should use a fixed key pair (for testing)
+      if (process.env.USE_FIXED_KEY === 'true' && fs.existsSync(process.env.FIXED_KEY_PATH || '~/.ssh/id_rsa_infrawatch')) {
+        try {
+          const keyPath = process.env.FIXED_KEY_PATH || '~/.ssh/id_rsa_infrawatch';
+          logger.info(`Using fixed key pair from ${keyPath}`);
+          privateKey = fs.readFileSync(keyPath.replace(/^~/, os.homedir()), 'utf8');
+
+          // Try to read public key if it exists
+          const pubKeyPath = `${keyPath}.pub`;
+          if (fs.existsSync(pubKeyPath.replace(/^~/, os.homedir()))) {
+            publicKey = fs.readFileSync(pubKeyPath.replace(/^~/, os.homedir()), 'utf8').trim();
+          } else {
+            // Generate a temporary public key just for signing
+            // This won't be used for authentication, just for getting a certificate
+            const tempKeyPair = this.generateKeyPair();
+            publicKey = tempKeyPair.publicKey;
+          }
+        } catch (keyError) {
+          logger.error(`Failed to read fixed key pair: ${keyError.message}`);
+          // Fall back to generating a temporary key pair
+          const tempKeyPair = this.generateKeyPair();
+          publicKey = tempKeyPair.publicKey;
+          privateKey = tempKeyPair.privateKey;
+        }
+      } else {
+        // Generate temporary key pair
+        const tempKeyPair = this.generateKeyPair();
+        publicKey = tempKeyPair.publicKey;
+        privateKey = tempKeyPair.privateKey;
+      }
 
       // Get signed certificate from Vault
       const { certificate, serialNumber } = await vaultSSHService.signSSHKey(
@@ -283,11 +314,21 @@ class SSHSessionService {
           port: 22,
           username: sessionData.sshUser,
           // Use the private key for authentication
-          privateKey: sessionData.privateKey,
-          // Add debug option to see more details
-          debug: (message) => logger.debug(`SSH2 Debug: ${message}`),
+          // Ensure the private key is properly formatted
+          privateKey: sessionData.privateKey.trim(),  // Trim any extra whitespace
           // Increase readyTimeout
-          readyTimeout: 30000
+          readyTimeout: 30000,
+          // Add detailed debugging
+          debug: (message) => {
+            logger.debug(`SSH2 Debug: ${message}`);
+            // Log specific authentication-related messages with higher visibility
+            if (message.includes('Authentication method')) {
+              logger.info(`SSH Authentication: ${message}`);
+            }
+            if (message.includes('publickey')) {
+              logger.info(`SSH Publickey: ${message}`);
+            }
+          }
         };
 
         // Add certificate if available and not disabled for testing
@@ -296,17 +337,33 @@ class SSHSessionService {
         if (sessionData.certificate && !disableCertAuth) {
           // Ensure certificate is in the correct format
           if (sessionData.certificate.startsWith('ssh-rsa-cert-v01@openssh.com ')) {
-            connectOptions.certificate = sessionData.certificate;
-            logger.info('Using certificate-based authentication');
-            logger.debug(`Certificate full content: ${sessionData.certificate}`);
+            // Important: Make sure the certificate is properly formatted
+            // The ssh2 library is very sensitive to the exact format
+            const certParts = sessionData.certificate.split(' ');
+            if (certParts.length >= 2) {
+              // Reconstruct the certificate to ensure proper format
+              // This ensures we have exactly the format: type base64data [comment]
+              const certType = certParts[0];
+              const certData = certParts[1];
+              const certComment = certParts.length > 2 ? certParts.slice(2).join(' ') : '';
 
-            // Verify certificate can be parsed
-            try {
-              // We can't directly verify the certificate here, but we log it for debugging
-              logger.info('Certificate format appears valid');
-            } catch (certError) {
-              logger.error(`Certificate validation error: ${certError.message}`);
-              logger.warn('Will attempt to connect anyway, but certificate authentication may fail');
+              // Reconstruct with proper spacing
+              const formattedCert = certComment ?
+                `${certType} ${certData} ${certComment}` :
+                `${certType} ${certData}`;
+
+              connectOptions.certificate = formattedCert;
+              logger.info('Using certificate-based authentication');
+              logger.debug(`Certificate full content: ${formattedCert}`);
+
+              // Set specific authentication methods and order
+              // This ensures we try certificate auth first, then key, then password
+              connectOptions.authHandler = ['publickey', 'password'];
+
+              logger.info('Authentication methods set to: publickey, password');
+            } else {
+              logger.error('Certificate has invalid structure (not enough parts)');
+              logger.error(`Certificate: ${sessionData.certificate}`);
             }
           } else {
             logger.error('Certificate has invalid format, not using it for authentication');

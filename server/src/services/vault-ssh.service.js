@@ -158,10 +158,28 @@ class VaultSSHService {
 
             // Try to validate the certificate
             try {
-              execSync(`ssh-keygen -L -f "${certPath}"`, { stdio: 'ignore' });
+              const output = execSync(`ssh-keygen -L -f "${certPath}"`, { encoding: 'utf8' });
               logger.info('Certificate validated successfully with ssh-keygen');
+              logger.debug(`Certificate validation output: ${output.substring(0, 200)}...`);
+
+              // Extract important information from the certificate
+              if (output.includes('Principals:')) {
+                const principalsMatch = output.match(/Principals:\s*([^\n]+)/m);
+                if (principalsMatch && principalsMatch[1]) {
+                  logger.info(`Certificate principals: ${principalsMatch[1].trim()}`);
+                }
+              }
+
+              if (output.includes('Valid:')) {
+                const validMatch = output.match(/Valid:\s*([^\n]+)/m);
+                if (validMatch && validMatch[1]) {
+                  logger.info(`Certificate validity: ${validMatch[1].trim()}`);
+                }
+              }
             } catch (validateError) {
               logger.error(`Certificate validation failed: ${validateError.message}`);
+              if (validateError.stdout) logger.error(`Validation stdout: ${validateError.stdout}`);
+              if (validateError.stderr) logger.error(`Validation stderr: ${validateError.stderr}`);
               throw new Error('Certificate validation failed');
             } finally {
               // Clean up
