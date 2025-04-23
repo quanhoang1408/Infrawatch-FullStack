@@ -34,9 +34,10 @@ class SSHSessionService {
 
         logger.info('Successfully executed ssh-keygen command');
       } catch (error) {
+        // If ssh-keygen fails, throw an error instead of using fallback
+        // The fallback method using Node.js crypto has proven to be problematic with SSH certificates
         logger.error('Failed to execute ssh-keygen:', error);
-        // Fallback to Node.js crypto if ssh-keygen fails
-        return this.generateKeyPairFallback();
+        throw new Error('Failed to generate SSH key pair using ssh-keygen. This is required for certificate-based authentication.');
       }
 
       // Read the generated keys
@@ -50,11 +51,13 @@ class SSHSessionService {
 
       // Verify the keys are in the correct format
       if (!privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-        logger.warn('Private key is not in PEM format, may cause authentication issues');
+        logger.error('Private key is not in PEM format, this will cause authentication issues');
+        throw new Error('Generated private key is not in PEM format');
       }
 
       if (!publicKey.startsWith('ssh-rsa ')) {
-        logger.warn('Public key is not in OpenSSH format, may cause signing issues');
+        logger.error('Public key is not in OpenSSH format, this will cause signing issues');
+        throw new Error('Generated public key is not in OpenSSH format');
       }
 
       // Clean up temporary files
@@ -69,50 +72,15 @@ class SSHSessionService {
       return { publicKey, privateKey };
     } catch (error) {
       logger.error('Failed to generate SSH key pair:', error);
-      // Fallback to Node.js crypto if anything fails
-      return this.generateKeyPairFallback();
+      throw error; // Don't use fallback, propagate the error
     }
   }
 
+  // This method is kept for reference but should not be used
+  // It has been proven to generate keys that are not compatible with SSH certificates
   generateKeyPairFallback() {
-    logger.info('Using fallback method to generate SSH key pair');
-    try {
-      // Generate key pair using Node.js crypto
-      const tempKeyPair = generateKeyPairSync('rsa', {
-        modulusLength: 2048,
-        publicKeyEncoding: {
-          type: 'spki',
-          format: 'pem'
-        },
-        privateKeyEncoding: {
-          type: 'pkcs1', // Use pkcs1 format for better compatibility with SSH
-          format: 'pem'
-        }
-      });
-
-      // Log the generated keys for debugging
-      logger.debug(`Fallback public key (first 20 chars): ${tempKeyPair.publicKey.substring(0, 20)}...`);
-      logger.debug(`Fallback private key (first 20 chars): ${tempKeyPair.privateKey.substring(0, 20)}...`);
-
-      // Convert the public key to OpenSSH format
-      // This is a simplified conversion and may not work in all cases
-      // The proper way would be to use ssh-keygen to convert the key
-      const publicKeyLines = tempKeyPair.publicKey
-        .replace('-----BEGIN PUBLIC KEY-----\n', '')
-        .replace('\n-----END PUBLIC KEY-----\n', '')
-        .replace(/\n/g, '');
-
-      const sshPublicKey = `ssh-rsa ${publicKeyLines} web-ssh-key`;
-      logger.debug(`Converted public key (first 20 chars): ${sshPublicKey.substring(0, 20)}...`);
-
-      return {
-        publicKey: sshPublicKey,
-        privateKey: tempKeyPair.privateKey
-      };
-    } catch (error) {
-      logger.error('Failed to generate SSH key pair using fallback method:', error);
-      throw error;
-    }
+    logger.error('Fallback key generation method is disabled - it produces incompatible keys');
+    throw new Error('SSH key generation fallback is disabled. Please ensure ssh-keygen is available.');
   }
 
   async initiateSession(vmId, sshUser) {
@@ -326,9 +294,24 @@ class SSHSessionService {
         const disableCertAuth = process.env.DISABLE_CERT_AUTH === 'true';
 
         if (sessionData.certificate && !disableCertAuth) {
-          connectOptions.certificate = sessionData.certificate;
-          logger.info('Using certificate-based authentication');
-          logger.debug(`Certificate full content: ${sessionData.certificate}`);
+          // Ensure certificate is in the correct format
+          if (sessionData.certificate.startsWith('ssh-rsa-cert-v01@openssh.com ')) {
+            connectOptions.certificate = sessionData.certificate;
+            logger.info('Using certificate-based authentication');
+            logger.debug(`Certificate full content: ${sessionData.certificate}`);
+
+            // Verify certificate can be parsed
+            try {
+              // We can't directly verify the certificate here, but we log it for debugging
+              logger.info('Certificate format appears valid');
+            } catch (certError) {
+              logger.error(`Certificate validation error: ${certError.message}`);
+              logger.warn('Will attempt to connect anyway, but certificate authentication may fail');
+            }
+          } else {
+            logger.error('Certificate has invalid format, not using it for authentication');
+            logger.error(`Certificate format: ${sessionData.certificate.substring(0, 30)}...`);
+          }
         } else {
           if (disableCertAuth) {
             logger.info('Certificate authentication disabled for testing');

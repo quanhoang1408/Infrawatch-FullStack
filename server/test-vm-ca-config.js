@@ -1,6 +1,6 @@
 /**
  * Test script to verify VM is configured to trust Vault CA
- * 
+ *
  * This script checks if the VM is properly configured to trust certificates signed by Vault:
  * 1. Gets the Vault CA public key
  * 2. Checks if the VM has the CA public key in the trusted keys file
@@ -17,27 +17,30 @@ const error = (message) => console.error(`[${new Date().toISOString()}] ERROR: $
 // Configuration - update these values
 const VM_IP = process.env.VM_IP || '54.197.5.26'; // Default to the IP in the error logs
 const SSH_USER = process.env.SSH_USER || 'ubuntu';
-const SSH_PASSWORD = process.env.SSH_PASSWORD || 'ubuntu';
+const SSH_PASSWORD = process.env.SSH_PASSWORD || '';
+
+// Path to existing SSH key (if you want to use an existing key instead of password)
+const EXISTING_KEY_PATH = process.env.EXISTING_KEY_PATH || '';
 
 async function main() {
   try {
     log('Starting VM CA configuration test');
     log(`Target VM: ${VM_IP}, User: ${SSH_USER}`);
-    
+
     // Step 1: Get Vault CA public key
     log('Getting Vault CA public key...');
     const caPublicKey = await vaultSSHService.getCAPublicKey();
-    
+
     if (!caPublicKey) {
       throw new Error('Failed to get Vault CA public key');
     }
-    
+
     log(`Vault CA public key: ${caPublicKey.substring(0, 40)}...`);
-    
+
     // Step 2: Check if VM has the CA public key in trusted keys
     log('Checking if VM trusts the Vault CA...');
     await checkVMTrustsCA(caPublicKey);
-    
+
     log('VM CA configuration test completed');
   } catch (err) {
     error(`Test failed: ${err.message}`);
@@ -49,47 +52,47 @@ async function checkVMTrustsCA(caPublicKey) {
   return new Promise((resolve, reject) => {
     // Connect to VM using password authentication
     const conn = new Client();
-    
+
     conn.on('ready', () => {
       log('Connected to VM');
-      
+
       // Check for CA public key in trusted keys file
       const checkCommand = `grep -F "${caPublicKey.substring(0, 40)}" /etc/ssh/trusted-user-ca-keys.pem || echo "CA not found"`;
-      
+
       conn.exec(checkCommand, (err, stream) => {
         if (err) {
           conn.end();
           return reject(new Error(`Failed to execute command: ${err.message}`));
         }
-        
+
         let output = '';
         stream.on('data', (data) => {
           output += data.toString();
         });
-        
+
         stream.on('close', (code) => {
           if (output.includes('CA not found')) {
             log('Vault CA public key is NOT in the trusted keys file');
-            
+
             // Check if trusted-user-ca-keys.pem exists
             conn.exec('ls -la /etc/ssh/trusted-user-ca-keys.pem || echo "File not found"', (err2, stream2) => {
               if (err2) {
                 conn.end();
                 return reject(new Error(`Failed to check for trusted keys file: ${err2.message}`));
               }
-              
+
               let output2 = '';
               stream2.on('data', (data) => {
                 output2 += data.toString();
               });
-              
+
               stream2.on('close', (code2) => {
                 if (output2.includes('File not found')) {
                   log('trusted-user-ca-keys.pem file does not exist');
                 } else {
                   log(`trusted-user-ca-keys.pem exists: ${output2.trim()}`);
                 }
-                
+
                 // Check SSH server configuration
                 checkSSHConfig(conn).then(() => {
                   conn.end();
@@ -102,7 +105,7 @@ async function checkVMTrustsCA(caPublicKey) {
             });
           } else {
             log('Vault CA public key is in the trusted keys file');
-            
+
             // Check SSH server configuration
             checkSSHConfig(conn).then(() => {
               conn.end();
@@ -115,20 +118,33 @@ async function checkVMTrustsCA(caPublicKey) {
         });
       });
     });
-    
+
     conn.on('error', (err) => {
       error(`Connection error: ${err.message}`);
       reject(err);
     });
-    
-    // Connect with password authentication
-    conn.connect({
+
+    // Prepare connection options
+    const connectOptions = {
       host: VM_IP,
       port: 22,
       username: SSH_USER,
-      password: SSH_PASSWORD,
       readyTimeout: 30000
-    });
+    };
+
+    // Use private key if available, otherwise use password
+    if (EXISTING_KEY_PATH && fs.existsSync(EXISTING_KEY_PATH)) {
+      log(`Using private key from ${EXISTING_KEY_PATH} for authentication`);
+      connectOptions.privateKey = fs.readFileSync(EXISTING_KEY_PATH, 'utf8');
+    } else if (SSH_PASSWORD) {
+      log('Using password authentication');
+      connectOptions.password = SSH_PASSWORD;
+    } else {
+      return reject(new Error('No authentication method available. Please provide either a private key path or password.'));
+    }
+
+    // Connect to VM
+    conn.connect(connectOptions);
   });
 }
 
@@ -136,17 +152,17 @@ async function checkSSHConfig(conn) {
   return new Promise((resolve, reject) => {
     // Check SSH server configuration for certificate authentication
     const checkSSHDConfig = `grep -E "TrustedUserCAKeys|AuthorizedPrincipalsFile" /etc/ssh/sshd_config`;
-    
+
     conn.exec(checkSSHDConfig, (err, stream) => {
       if (err) {
         return reject(new Error(`Failed to check SSH config: ${err.message}`));
       }
-      
+
       let output = '';
       stream.on('data', (data) => {
         output += data.toString();
       });
-      
+
       stream.on('close', (code) => {
         if (output.trim() === '') {
           log('SSH server is NOT configured for certificate authentication');
@@ -159,7 +175,7 @@ async function checkSSHConfig(conn) {
             }
           });
         }
-        
+
         // Check if certificate authentication is working
         testCertificateAuth(conn).then(resolve).catch(resolve); // Continue even if this fails
       });
@@ -175,20 +191,20 @@ async function testCertificateAuth(conn) {
         if (!certificate) {
           return reject(new Error('No certificate returned from signing operation'));
         }
-        
+
         // Check if the certificate is valid on the VM
         const checkCertCommand = `echo "${certificate}" > /tmp/test-cert.pub && ssh-keygen -L -f /tmp/test-cert.pub && rm /tmp/test-cert.pub`;
-        
+
         conn.exec(checkCertCommand, (err, stream) => {
           if (err) {
             return reject(new Error(`Failed to check certificate: ${err.message}`));
           }
-          
+
           let output = '';
           stream.on('data', (data) => {
             output += data.toString();
           });
-          
+
           stream.on('close', (code) => {
             if (code === 0) {
               log('Certificate validation successful:');

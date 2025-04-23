@@ -1,5 +1,9 @@
 const config = require('../config/vault');
 const logger = require('../utils/logger');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { execSync } = require('child_process');
 
 const vault = require('node-vault')({
   apiVersion: 'v1',
@@ -92,16 +96,13 @@ class VaultSSHService {
       // Format the public key if needed
       let formattedKey = publicKey;
 
-      // Check if the key is in PEM format and convert if needed
-      if (publicKey.includes('-----BEGIN PUBLIC KEY-----') || publicKey.includes('-----BEGIN RSA PUBLIC KEY-----')) {
-        logger.info('Detected PEM format key, using as-is for Vault signing');
-        // Vault can handle PEM format directly
-      } else if (!publicKey.startsWith('ssh-rsa ') && !publicKey.startsWith('ssh-ed25519 ')) {
-        // If it's not in OpenSSH format and not in PEM format, try to add ssh-rsa prefix
-        logger.warn('Key is not in OpenSSH or PEM format, attempting to fix...');
-        formattedKey = `ssh-rsa ${publicKey} web-ssh-key`;
-        logger.info('Added ssh-rsa prefix to key');
-        logger.debug(`Formatted key: ${formattedKey}`);
+      // Validate the public key format
+      if (!publicKey.startsWith('ssh-rsa ') && !publicKey.startsWith('ssh-ed25519 ')) {
+        // If it's not in OpenSSH format, reject it
+        // We no longer try to fix malformed keys as this has proven problematic
+        logger.error('Public key is not in OpenSSH format (must start with ssh-rsa or ssh-ed25519)');
+        logger.error(`Received key format: ${publicKey.substring(0, 30)}...`);
+        throw new Error('Public key must be in OpenSSH format (starting with ssh-rsa or ssh-ed25519)');
       }
 
       // Try to sign the key with Vault
@@ -124,21 +125,60 @@ class VaultSSHService {
 
           // Validate certificate format
           if (!data.signed_key.startsWith('ssh-rsa-cert-v01@openssh.com ')) {
-            logger.warn('Certificate does not have expected format (should start with ssh-rsa-cert-v01@openssh.com)');
+            logger.error('Certificate does not have expected format (should start with ssh-rsa-cert-v01@openssh.com)');
+            logger.error(`Received certificate format: ${data.signed_key.substring(0, 30)}...`);
+            throw new Error('Invalid certificate format received from Vault');
+          }
+
+          // Verify certificate structure
+          const certParts = data.signed_key.split(' ');
+          if (certParts.length < 2) {
+            logger.error('Certificate has invalid structure (should have at least 2 parts)');
+            throw new Error('Invalid certificate structure received from Vault');
           }
 
           // Check for any non-base64 characters that could cause parsing issues
+          // Note: We don't throw an error here because some non-standard characters might be valid
+          // in the certificate data, but we log a warning
           const base64Regex = /^[A-Za-z0-9+/=]+$/;
-          const certParts = data.signed_key.split(' ');
-          if (certParts.length >= 2) {
-            const certData = certParts[1]; // The base64 encoded part
-            if (!base64Regex.test(certData)) {
-              logger.warn('Certificate contains non-base64 characters which may cause parsing issues');
-              logger.debug(`Certificate data part: ${certData}`);
+          const certData = certParts[1]; // The base64 encoded part
+          if (!base64Regex.test(certData)) {
+            logger.warn('Certificate contains non-base64 characters which may cause parsing issues');
+            logger.debug(`Certificate data part: ${certData}`);
+          }
+
+          // Verify certificate with ssh-keygen if possible
+          try {
+            // Create a temporary file to test the certificate
+            const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ssh-cert-'));
+            const certPath = path.join(tempDir, 'test-cert.pub');
+
+            // Write certificate to file
+            fs.writeFileSync(certPath, data.signed_key);
+
+            // Try to validate the certificate
+            try {
+              execSync(`ssh-keygen -L -f "${certPath}"`, { stdio: 'ignore' });
+              logger.info('Certificate validated successfully with ssh-keygen');
+            } catch (validateError) {
+              logger.error(`Certificate validation failed: ${validateError.message}`);
+              throw new Error('Certificate validation failed');
+            } finally {
+              // Clean up
+              try {
+                fs.unlinkSync(certPath);
+                fs.rmdirSync(tempDir);
+              } catch (cleanupError) {
+                logger.warn(`Failed to clean up temporary certificate file: ${cleanupError.message}`);
+              }
             }
+          } catch (tempError) {
+            logger.warn(`Could not verify certificate: ${tempError.message}`);
+            // Continue anyway, as we might not have ssh-keygen available
           }
         } else {
           logger.warn('No signed certificate received from Vault');
+          throw new Error('No signed certificate received from Vault');
         }
 
         logger.info(`Successfully signed SSH key for user ${username}, serial: ${data.serial_number}`);
@@ -154,24 +194,23 @@ class VaultSSHService {
     } catch (error) {
       logger.error(`Failed to sign SSH key for user ${username}:`, error);
 
-      // If Vault is not configured or there's an error, provide a mock certificate for testing
+      // If Vault is not configured, log a clear error
       if (!config.vault.token || error.message.includes('no vault token')) {
-        logger.warn('Vault token not configured or invalid. Using private key authentication without certificate.');
-        return {
-          // Return null certificate to fall back to private key authentication
-          certificate: null,
-          serialNumber: `mock-serial-${Date.now()}`
-        };
+        logger.error('Vault token not configured or invalid. Certificate-based authentication will not work.');
+        logger.error('Please configure Vault token in the environment variables.');
+
+        // In development, we can fall back to private key authentication
+        if (process.env.NODE_ENV === 'development') {
+          logger.warn('Development mode: Falling back to private key authentication without certificate.');
+          return {
+            certificate: null,
+            serialNumber: `mock-serial-${Date.now()}`
+          };
+        }
       }
 
-      // For development/testing, we can return a null certificate for any error
-      // This allows testing the SSH terminal feature without a working Vault setup
-      // by falling back to private key or password authentication
-      logger.warn('Vault signing error. Falling back to private key authentication without certificate.');
-      return {
-        certificate: null,
-        serialNumber: `mock-error-${Date.now()}`
-      };
+      // Propagate the error
+      throw error;
     }
   }
 }
