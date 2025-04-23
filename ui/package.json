@@ -47,5 +47,15 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "https://api.infrawatch.website"
+  "proxy": "https://api.infrawatch.website",
+  "devServer": {
+    "proxy": {
+      "/ws-ssh": {
+        "target": "wss://api.infrawatch.website",
+        "ws": true,
+        "secure": false,
+        "changeOrigin": true
+      }
+    }
+  }
 }

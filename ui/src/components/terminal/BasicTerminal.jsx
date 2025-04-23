@@ -54,9 +54,42 @@ const BasicTerminal = ({
         console.log(`Creating WebSocket connection to ${wsUrl} with protocol sessionId.${sessionId}`);
         addOutput('info', `Creating WebSocket connection with protocol sessionId.${sessionId}`);
 
+        // Add more debug information
+        console.log('Browser WebSocket support:', {
+          WebSocket: typeof WebSocket !== 'undefined',
+          protocol: window.location.protocol,
+          host: window.location.host,
+          origin: window.location.origin
+        });
+
         // Create WebSocket with the session ID as the protocol
-        ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
-        websocketRef.current = ws;
+        try {
+          ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
+          websocketRef.current = ws;
+        } catch (error) {
+          console.error('Error creating WebSocket object:', error);
+          addOutput('error', `Error creating WebSocket object: ${error.message}`);
+
+          // Try without protocol
+          try {
+            console.log('Trying to create WebSocket without protocol');
+            ws = new WebSocket(wsUrl);
+            websocketRef.current = ws;
+            addOutput('warning', 'Created WebSocket without protocol - authentication may fail');
+          } catch (fallbackError) {
+            console.error('Error creating WebSocket without protocol:', fallbackError);
+            addOutput('error', `Error creating WebSocket without protocol: ${fallbackError.message}`);
+            throw fallbackError;
+          }
+        }
+
+        // Log WebSocket object properties
+        console.log('WebSocket created:', {
+          url: wsUrl,
+          protocol: ws.protocol,
+          readyState: ws.readyState,
+          binaryType: ws.binaryType
+        });
 
         // Add a timeout to detect connection issues
         const connectionTimeout = setTimeout(() => {
@@ -176,7 +209,29 @@ const BasicTerminal = ({
         if (wsUrl.startsWith('wss:') && window.location.protocol === 'http:') {
           addOutput('warning', 'You are trying to connect to a secure WebSocket (wss:) from an insecure page (http:). This may be blocked by your browser.');
           addOutput('info', 'Try accessing this page via HTTPS instead.');
+          addOutput('info', 'You can also try using the CORS Unblock extension for Chrome or Firefox.');
         }
+
+        // Suggest alternative approaches
+        addOutput('info', 'Trying to check server availability...');
+
+        // Check for network connectivity issues
+        fetch('https://api.infrawatch.website/health')
+          .then(response => {
+            if (response.ok) {
+              addOutput('info', 'API server is reachable. The issue might be with WebSocket specifically.');
+              addOutput('info', 'Possible solutions:');
+              addOutput('info', '1. Try using a CORS Unblock extension for your browser');
+              addOutput('info', '2. Try running the UI with HTTPS: HTTPS=true npm start');
+              addOutput('info', '3. Try using a different browser');
+              addOutput('info', '4. Check if your network allows WebSocket connections');
+            } else {
+              addOutput('warning', `API server returned status ${response.status}. There might be connectivity issues.`);
+            }
+          })
+          .catch(err => {
+            addOutput('warning', `Cannot reach API server: ${err.message}. Check your network connection.`);
+          });
       };
 
       ws.onclose = (event) => {
@@ -249,9 +304,15 @@ const BasicTerminal = ({
           document.removeEventListener('keydown', handleKeyDownRef.current);
         }
 
-        // If this was an abnormal closure and we were connected, suggest reconnecting
-        if (event.code === 1006 && connected) {
+        // If this was an abnormal closure, provide more detailed suggestions
+        if (event.code === 1006) {
           addOutput('info', 'You can try reconnecting by clicking the Connect button above.');
+          addOutput('info', 'If the issue persists, try the following:');
+          addOutput('info', '1. Install a CORS Unblock extension for your browser');
+          addOutput('info', '2. Run the UI with HTTPS: HTTPS=true npm start');
+          addOutput('info', '3. Try using a different browser');
+          addOutput('info', '4. Check if your network allows WebSocket connections');
+          addOutput('info', '5. Try connecting to the VM using a standard SSH client');
         }
       };
     } catch (e) {

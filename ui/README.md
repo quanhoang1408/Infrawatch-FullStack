@@ -14,6 +14,13 @@ Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 The page will reload when you make changes.\
 You may also see any lint errors in the console.
 
+### `HTTPS=true npm start`
+
+Runs the app in the development mode with HTTPS enabled.\
+Open [https://localhost:3000](https://localhost:3000) to view it in your browser.
+
+This is useful when connecting to secure WebSocket endpoints (wss://) to avoid mixed content issues.
+
 ### `npm test`
 
 Launches the test runner in the interactive watch mode.\
@@ -38,6 +45,45 @@ If you aren't satisfied with the build tool and configuration choices, you can `
 Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
 You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+
+## Troubleshooting
+
+### WebSocket Connection Issues
+
+If you encounter WebSocket connection issues when using the Terminal feature, try the following solutions:
+
+1. **Use HTTPS for development**:
+   ```bash
+   HTTPS=true npm start
+   ```
+   This will run the app with HTTPS enabled, allowing secure WebSocket connections (wss://).
+
+2. **Install a CORS Unblock extension**:
+   - Chrome: [CORS Unblock](https://chrome.google.com/webstore/detail/cors-unblock/lfhmikememgdcahcdlaciloancbhjino)
+   - Firefox: [CORS Everywhere](https://addons.mozilla.org/en-US/firefox/addon/cors-everywhere/)
+
+3. **Try a different browser**:
+   Some browsers handle WebSocket connections differently. Try using Chrome, Firefox, or Edge.
+
+4. **Check network restrictions**:
+   Some networks block WebSocket connections. Try using a different network or VPN.
+
+5. **Use ngrok for tunneling**:
+   ```bash
+   # Install ngrok
+   npm install -g ngrok
+
+   # Start ngrok tunnel
+   ngrok http 3000
+   ```
+   Then use the ngrok URL to access the application. This can help bypass network restrictions.
+
+6. **Use SSH directly**:
+   If the WebSocket terminal doesn't work, you can still connect to the VM using a standard SSH client:
+   ```bash
+   ssh -i /path/to/private/key username@vm-ip-address
+   ```
+   You can get the VM IP address from the VM details page.
 
 ## Learn More
 

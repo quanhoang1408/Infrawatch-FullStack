@@ -25,7 +25,14 @@ app.use(compression());
 
 // Enable CORS with specific options
 app.use(cors({
-  origin: ['https://api.infrawatch.website', 'http://localhost:8000'], // Allow specific origins
+  // Allow specific origins including localhost:3000 for development
+  origin: [
+    'https://api.infrawatch.website',
+    'http://localhost:8000',
+    'http://localhost:3000',
+    'https://localhost:3000',
+    'https://localhost:8000'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token', 'Sec-WebSocket-Protocol'],
   credentials: true,

@@ -38,6 +38,14 @@ function setupWSServer(server) {
 
   wss.on('connection', (ws, req) => {
     try {
+      // Log connection details
+      logger.info(`New WebSocket connection from ${req.socket.remoteAddress}`);
+      logger.info(`Headers: ${JSON.stringify({
+        origin: req.headers.origin,
+        host: req.headers.host,
+        protocol: req.headers['sec-websocket-protocol']
+      })}`);
+
       // Extract session ID from protocol
       const protocol = ws.protocol;
       let sessionId;

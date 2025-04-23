@@ -146,17 +146,33 @@ const Terminal = () => {
     // Determine the WebSocket URL based on environment
     let wsUrl;
 
-    // Always use secure WebSocket (wss:) when connecting to api.infrawatch.website
-    // Use protocol based on current page for other hosts
+    // Use protocol based on current page and target host
     let wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
     // Use the API domain for WebSocket connection
     // For local development, connect to the remote server
-    const wsHost = window.location.hostname === 'localhost' ? 'api.infrawatch.website' : window.location.host;
+    let wsHost = window.location.hostname === 'localhost' ? 'api.infrawatch.website' : window.location.host;
 
-    // Force wss: for api.infrawatch.website
+    // Check if we should use a proxy for WebSocket
+    const useProxy = process.env.REACT_APP_USE_WS_PROXY === 'true';
+    console.log('WebSocket proxy configuration:', {
+      REACT_APP_USE_WS_PROXY: process.env.REACT_APP_USE_WS_PROXY,
+      useProxy
+    });
+
+    // Try a different approach - use a secure WebSocket URL
+    if (window.location.hostname === 'localhost') {
+      // For localhost, use a secure WebSocket URL
+      wsUrl = `wss://api.infrawatch.website/ws-ssh`;
+      console.log('Using secure WebSocket URL for localhost');
+      return wsUrl;
+    }
+
+    // For other hosts, use the full URL
     if (wsHost === 'api.infrawatch.website') {
-      wsProtocol = 'wss:';
+      // Always use ws: for now to avoid mixed content issues
+      wsProtocol = 'ws:';
+      console.log('Using ws: protocol for all connections to avoid mixed content issues');
     }
 
     // Construct the WebSocket URL
