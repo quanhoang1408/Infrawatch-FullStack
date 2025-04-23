@@ -488,13 +488,78 @@ class OpenSSHSessionService {
               return;
             } else if (jsonData.type === 'input') {
               // Handle input data from client
-              logger.info(`Received command: ${jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
+              const commandStr = jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t');
+              logger.info(`Received command: ${commandStr}`);
 
-              // Write the input data to the SSH process
-              if (jsonData.data) {
-                logger.debug(`Writing command to SSH process: ${jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}`);
+              // Check if it's a simple command that we can execute directly
+              if (jsonData.data.trim().endsWith('\r')) {
+                const cmd = jsonData.data.trim().replace('\r', '');
+
+                // For simple commands, try executing directly and sending result
+                if (['ls', 'pwd', 'whoami', 'hostname', 'date', 'echo'].some(c => cmd.startsWith(c))) {
+                  try {
+                    // Still send the command to the SSH process
+                    logger.debug(`Writing command to SSH process: ${commandStr}`);
+                    writeToProcess(Buffer.from(jsonData.data));
+                    logger.debug('Command written to SSH process successfully');
+
+                    // But also execute locally as a fallback
+                    const { exec } = require('child_process');
+                    logger.info(`Executing command directly as fallback: ${cmd}`);
+
+                    // Execute the command with a timeout
+                    exec(`ssh -i ${sessionData.keyPath} -o CertificateFile=${sessionData.certPath} -o StrictHostKeyChecking=no ${sessionData.sshUser}@${sessionData.targetIp} "${cmd}"`,
+                      { timeout: 5000 }, (error, stdout, stderr) => {
+                        if (error) {
+                          logger.error(`Error executing command directly: ${error.message}`);
+                          return;
+                        }
+
+                        if (stdout) {
+                          logger.info(`Direct command stdout: ${stdout}`);
+                          // Send the result to the client
+                          if (ws.readyState === 1) {
+                            try {
+                              ws.send(JSON.stringify({
+                                type: 'data',
+                                data: stdout + '\r\n'
+                              }));
+                              logger.info('Direct command result sent to client');
+                            } catch (sendError) {
+                              logger.error(`Error sending direct command result: ${sendError.message}`);
+                            }
+                          }
+                        }
+
+                        if (stderr) {
+                          logger.info(`Direct command stderr: ${stderr}`);
+                          // Send stderr to client as well
+                          if (ws.readyState === 1) {
+                            try {
+                              ws.send(JSON.stringify({
+                                type: 'data',
+                                data: stderr + '\r\n'
+                              }));
+                            } catch (sendError) {
+                              logger.error(`Error sending direct command stderr: ${sendError.message}`);
+                            }
+                          }
+                        }
+                    });
+                  } catch (execError) {
+                    logger.error(`Error setting up direct command execution: ${execError.message}`);
+                  }
+                } else {
+                  // For complex commands, just send to SSH process
+                  logger.debug(`Writing command to SSH process: ${commandStr}`);
+                  writeToProcess(Buffer.from(jsonData.data));
+                  logger.debug('Command written to SSH process successfully');
+                }
+              } else {
+                // Not a complete command, just forward to SSH process
+                logger.debug(`Writing input to SSH process: ${commandStr}`);
                 writeToProcess(Buffer.from(jsonData.data));
-                logger.debug('Command written to SSH process successfully');
+                logger.debug('Input written to SSH process successfully');
               }
               return;
             }
