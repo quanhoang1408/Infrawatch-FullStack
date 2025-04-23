@@ -166,31 +166,33 @@ class OpenSSHSessionService {
         '-o', 'ServerAliveCountMax=3', // Number of alive messages without response
         '-o', 'ConnectTimeout=30', // Connection timeout in seconds
         '-o', 'SendEnv=TERM', // Send terminal environment
-        '-t', // Force pseudo-terminal allocation
+        '-tt', // Force pseudo-terminal allocation (double -t for non-interactive stdin)
         `${sessionData.sshUser}@${sessionData.targetIp}`
       ];
 
       logger.info(`SSH command: ssh ${sshArgs.join(' ')}`);
 
-      // Spawn SSH process with pseudo-terminal allocation
-      // Use the -tt option to force pseudo-terminal allocation even when stdin is not a terminal
-      sshArgs.unshift('-tt');
+      // Add environment variables for better terminal support
+      const sshEnv = {
+        ...process.env,
+        TERM: 'xterm-256color',
+        FORCE_COLOR: '1', // Force color output
+        COLORTERM: 'truecolor', // Enable true color support
+        LANG: 'en_US.UTF-8', // Set locale for proper character handling
+        LC_ALL: 'en_US.UTF-8'
+      };
 
       // We'll use regular child_process since node-pty requires compilation
       // and may not be available in all environments
       let ptyProcess = null;
       logger.info('Using regular child_process for SSH connection');
 
-      // If node-pty is not available, use regular child_process
-      const sshProcess = ptyProcess || spawn('ssh', sshArgs, {
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-          FORCE_COLOR: '1', // Force color output
-          COLORTERM: 'truecolor' // Enable true color support
-        },
+      // Use regular child_process with improved configuration
+      const sshProcess = spawn('ssh', sshArgs, {
+        env: sshEnv,
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: false // Don't use shell to avoid issues with output
+        shell: false, // Don't use shell to avoid issues with output
+        windowsHide: true // Hide the console window on Windows
       });
 
       // Check if process started successfully
@@ -338,18 +340,14 @@ class OpenSSHSessionService {
             try {
               // Try direct string send first
               try {
-                // Send raw data directly
-                ws.send(data);
-                logger.info('Raw data sent directly');
-
-                // Also send as JSON as backup
+                // Send as JSON only to avoid duplicate output
                 const jsonData = JSON.stringify({
                   type: 'data',
                   data: dataStr
                 });
 
                 ws.send(jsonData);
-                logger.info('Also sent as JSON data');
+                logger.info('Data sent as JSON');
               } catch (directError) {
                 logger.error(`Error sending direct data: ${directError.message}`);
 
@@ -390,18 +388,14 @@ class OpenSSHSessionService {
             try {
               // Try direct string send first
               try {
-                // Send raw data directly
-                ws.send(data);
-                logger.info('Raw stderr data sent directly');
-
-                // Also send as JSON as backup
+                // Send as JSON only to avoid duplicate output
                 const jsonData = JSON.stringify({
                   type: 'data',
                   data: stderr
                 });
 
                 ws.send(jsonData);
-                logger.info('Stderr also sent as JSON data');
+                logger.info('Stderr data sent as JSON');
               } catch (directError) {
                 logger.error(`Error sending direct stderr data: ${directError.message}`);
 
@@ -498,7 +492,9 @@ class OpenSSHSessionService {
                 logger.info(`Extracted command: '${cmd}'`);
 
                 // For simple commands, try executing directly and sending result
-                if (['ls', 'pwd', 'whoami', 'hostname', 'date', 'echo', 'cat', 'ps', 'free', 'df', 'du', 'uname', 'id', 'uptime', 'w', 'who', 'last', 'netstat', 'ifconfig', 'ip'].some(c => cmd.startsWith(c))) {
+                // Exclude interactive commands like nano, vim, etc.
+                if (['ls', 'pwd', 'whoami', 'hostname', 'date', 'echo', 'cat', 'ps', 'free', 'df', 'du', 'uname', 'id', 'uptime', 'w', 'who', 'last', 'netstat', 'ifconfig', 'ip'].some(c => cmd.startsWith(c)) &&
+                    !['nano', 'vim', 'vi', 'emacs', 'less', 'more', 'top', 'htop', 'tail -f'].some(c => cmd.startsWith(c))) {
                   logger.info(`Detected simple command: ${cmd}`);
                   try {
                     // Still send the command to the SSH process
@@ -538,15 +534,7 @@ class OpenSSHSessionService {
                           // Send the result to the client
                           if (ws.readyState === 1) {
                             try {
-                              // First try sending as raw data
-                              try {
-                                ws.send(Buffer.from(stdout + '\r\n'));
-                                logger.info('Raw stdout data sent directly');
-                              } catch (rawError) {
-                                logger.error(`Error sending raw stdout: ${rawError.message}`);
-                              }
-
-                              // Also send as JSON
+                              // Send as JSON only to avoid duplicate output
                               ws.send(JSON.stringify({
                                 type: 'data',
                                 data: stdout + '\r\n'
@@ -576,15 +564,7 @@ class OpenSSHSessionService {
                           // Send stderr to client as well
                           if (ws.readyState === 1) {
                             try {
-                              // First try sending as raw data
-                              try {
-                                ws.send(Buffer.from(stderr + '\r\n'));
-                                logger.info('Raw stderr data sent directly');
-                              } catch (rawError) {
-                                logger.error(`Error sending raw stderr: ${rawError.message}`);
-                              }
-
-                              // Also send as JSON
+                              // Send as JSON only to avoid duplicate output
                               ws.send(JSON.stringify({
                                 type: 'data',
                                 data: stderr + '\r\n'
@@ -616,6 +596,22 @@ class OpenSSHSessionService {
                   logger.debug(`Writing command to SSH process: ${commandStr}`);
                   writeToProcess(Buffer.from(jsonData.data));
                   logger.debug('Command written to SSH process successfully');
+
+                  // For interactive commands, send a message to the client
+                  if (['nano', 'vim', 'vi', 'emacs', 'less', 'more', 'top', 'htop'].some(c => cmd.startsWith(c))) {
+                    logger.info(`Detected interactive command: ${cmd}`);
+                    // Send a message to the client
+                    if (ws.readyState === 1) {
+                      try {
+                        ws.send(JSON.stringify({
+                          type: 'data',
+                          data: '\r\nInteractive command detected. Some features may not work properly.\r\n'
+                        }));
+                      } catch (sendError) {
+                        logger.error(`Error sending interactive command message: ${sendError.message}`);
+                      }
+                    }
+                  }
                 }
               } else {
                 // Not a complete command, just forward to SSH process
