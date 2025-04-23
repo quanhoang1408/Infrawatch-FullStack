@@ -262,15 +262,7 @@ class OpenSSHSessionService {
         certPath: sessionData.certPath
       });
 
-      // Send a test command to verify the connection is working
-      setTimeout(() => {
-        try {
-          logger.info('Sending test echo command to verify SSH connection');
-          writeToProcess(Buffer.from('echo "SSH connection test successful"\r'));
-        } catch (testError) {
-          logger.error(`Error sending test command: ${testError.message}`);
-        }
-      }, 2000); // Wait 2 seconds before sending test command
+      // No need for test command
 
       // Set up data handling based on whether we're using pty or regular process
       if (ptyProcess) {
@@ -297,43 +289,90 @@ class OpenSSHSessionService {
           this.activeSessions.delete(sessionId);
         });
       } else {
+        // Check if stdout and stderr are available
+        if (!sshProcess.stdout) {
+          logger.error('SSH process stdout is not available');
+          if (ws.readyState === 1) {
+            ws.send(JSON.stringify({
+              type: 'data',
+              data: '\r\nError: SSH process stdout is not available\r\n'
+            }));
+          }
+        }
+
+        if (!sshProcess.stderr) {
+          logger.error('SSH process stderr is not available');
+          if (ws.readyState === 1) {
+            ws.send(JSON.stringify({
+              type: 'data',
+              data: '\r\nError: SSH process stderr is not available\r\n'
+            }));
+          }
+        }
+
+        // Log initial state
+        logger.info(`SSH process initial state: PID=${sshProcess.pid}, killed=${sshProcess.killed}, exitCode=${sshProcess.exitCode}`);
+
+        // Send a direct message to client to confirm handler setup
+        if (ws.readyState === 1) {
+          try {
+            ws.send(JSON.stringify({
+              type: 'data',
+              data: '\r\nSSH connection established. Terminal ready.\r\n'
+            }));
+            logger.info('Sent initial connection message to client');
+          } catch (msgError) {
+            logger.error(`Failed to send initial message: ${msgError.message}`);
+          }
+        }
         // Handle SSH process stdout
         sshProcess.stdout.on('data', (data) => {
           // Always log stdout data regardless of WebSocket state
           const dataStr = data.toString('utf8');
           logger.info(`SSH stdout data received (${dataStr.length} bytes): ${dataStr.substring(0, 100)}${dataStr.length > 100 ? '...' : ''}`);
 
+          // Log raw buffer data for debugging
+          logger.info(`Raw buffer data: ${Buffer.from(data).toString('hex').substring(0, 100)}`);
+
           if (ws.readyState === 1) { // WebSocket.OPEN
             try {
-              // Convert binary data to JSON format to avoid Blob rendering issues
-              const jsonData = JSON.stringify({
-                type: 'data',
-                data: dataStr
-              });
+              // Try direct string send first
+              try {
+                // Send raw data directly
+                ws.send(data);
+                logger.info('Raw data sent directly');
 
-              logger.info(`Sending JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
-              ws.send(jsonData);
-              logger.info('Data sent to client successfully');
+                // Also send as JSON as backup
+                const jsonData = JSON.stringify({
+                  type: 'data',
+                  data: dataStr
+                });
 
-              // Force a small delay to ensure data is processed properly
-              setTimeout(() => {
-                try {
-                  // Send a small ping to ensure connection is still active
-                  ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-                  logger.debug('Sent ping after data to verify connection');
-                } catch (pingError) {
-                  logger.error(`Error sending verification ping: ${pingError.message}`);
-                }
-              }, 50);
+                ws.send(jsonData);
+                logger.info('Also sent as JSON data');
+              } catch (directError) {
+                logger.error(`Error sending direct data: ${directError.message}`);
+
+                // Fall back to JSON only
+                const jsonData = JSON.stringify({
+                  type: 'data',
+                  data: dataStr
+                });
+
+                logger.info(`Sending JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
+                ws.send(jsonData);
+                logger.info('JSON data sent successfully');
+              }
             } catch (error) {
               logger.error(`Error sending stdout data: ${error.message}`);
-              // Fallback to sending raw data if JSON conversion fails
-              logger.info('Falling back to sending raw data');
+              // Last resort - try to send a simple text message
               try {
-                ws.send(data);
-                logger.info('Raw data sent successfully');
-              } catch (rawError) {
-                logger.error(`Error sending raw data: ${rawError.message}`);
+                ws.send(JSON.stringify({
+                  type: 'data',
+                  data: 'Output received but could not be displayed. Check server logs.'
+                }));
+              } catch (finalError) {
+                logger.error(`Final error sending data: ${finalError.message}`);
               }
             }
           } else {
@@ -344,25 +383,49 @@ class OpenSSHSessionService {
         // Handle SSH process stderr
         sshProcess.stderr.on('data', (data) => {
           const stderr = data.toString();
-          logger.debug(`SSH stderr (${stderr.length} bytes): ${stderr.substring(0, 100)}${stderr.length > 100 ? '...' : ''}`);
+          logger.info(`SSH stderr (${stderr.length} bytes): ${stderr.substring(0, 100)}${stderr.length > 100 ? '...' : ''}`);
 
           // Send stderr to client as well
           if (ws.readyState === 1) {
             try {
-              // Convert stderr data to JSON format
-              const jsonData = JSON.stringify({
-                type: 'data',
-                data: stderr
-              });
+              // Try direct string send first
+              try {
+                // Send raw data directly
+                ws.send(data);
+                logger.info('Raw stderr data sent directly');
 
-              logger.debug(`Sending stderr JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
-              ws.send(jsonData);
-              logger.debug('Stderr data sent to client successfully');
+                // Also send as JSON as backup
+                const jsonData = JSON.stringify({
+                  type: 'data',
+                  data: stderr
+                });
+
+                ws.send(jsonData);
+                logger.info('Stderr also sent as JSON data');
+              } catch (directError) {
+                logger.error(`Error sending direct stderr data: ${directError.message}`);
+
+                // Fall back to JSON only
+                const jsonData = JSON.stringify({
+                  type: 'data',
+                  data: stderr
+                });
+
+                logger.info(`Sending stderr JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
+                ws.send(jsonData);
+                logger.info('Stderr JSON data sent successfully');
+              }
             } catch (error) {
               logger.error(`Error sending stderr data: ${error.message}`);
-              // Fallback to sending raw data if JSON conversion fails
-              logger.debug('Falling back to sending raw stderr data');
-              ws.send(data);
+              // Last resort - try to send a simple text message
+              try {
+                ws.send(JSON.stringify({
+                  type: 'data',
+                  data: 'Stderr output received but could not be displayed. Check server logs.'
+                }));
+              } catch (finalError) {
+                logger.error(`Final error sending stderr data: ${finalError.message}`);
+              }
             }
           } else {
             logger.warn(`Cannot send stderr data: WebSocket not open (readyState: ${ws.readyState})`);

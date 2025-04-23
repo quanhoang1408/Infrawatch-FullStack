@@ -314,8 +314,28 @@ const BasicTerminal = ({
               try {
                 // Convert ArrayBuffer to string
                 const text = new TextDecoder('utf-8').decode(reader.result);
-                console.log('Blob decoded to text:', text.substring(0, 100) + (text.length > 100 ? '...' : ''));
-                addOutput('output', text);
+                console.log('%c Blob decoded to text:', 'background: #9C27B0; color: white; padding: 2px 5px; border-radius: 2px;',
+                  text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+
+                // Try to parse as JSON first
+                try {
+                  const jsonData = JSON.parse(text);
+                  console.log('%c Parsed JSON from blob:', 'background: #E91E63; color: white; padding: 2px 5px; border-radius: 2px;', jsonData);
+
+                  if (jsonData.type === 'data') {
+                    // Add the data to output
+                    addOutput('output', jsonData.data);
+                    document.title = `Got JSON data from blob: ${jsonData.data.length} bytes`;
+                  } else {
+                    // Unknown type, add the whole JSON
+                    addOutput('output', JSON.stringify(jsonData));
+                  }
+                } catch (jsonError) {
+                  // Not JSON, add as raw text
+                  console.log('Blob is not JSON, adding as raw text');
+                  addOutput('output', text);
+                  document.title = `Got raw text from blob: ${text.length} bytes`;
+                }
               } catch (blobError) {
                 console.error('Error processing binary data:', blobError);
                 addOutput('error', `Error processing binary data: ${blobError.message}`);
