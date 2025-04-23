@@ -64,8 +64,19 @@ const BasicTerminal = ({
 
         // Create WebSocket with the session ID as the protocol
         try {
+          // First, check if the URL is valid
+          const urlPattern = /^(wss?:\/\/)[\w.-]+(:\d+)?(\/\S*)?$/;
+          if (!urlPattern.test(wsUrl)) {
+            console.error('Invalid WebSocket URL:', wsUrl);
+            addOutput('error', `Invalid WebSocket URL: ${wsUrl}`);
+            throw new Error(`Invalid WebSocket URL: ${wsUrl}`);
+          }
+
+          // Create WebSocket with protocol
+          console.log('Creating WebSocket with protocol:', [`sessionId.${sessionId}`]);
           ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
           websocketRef.current = ws;
+          addOutput('info', 'WebSocket created with session protocol');
         } catch (error) {
           console.error('Error creating WebSocket object:', error);
           addOutput('error', `Error creating WebSocket object: ${error.message}`);
@@ -76,6 +87,18 @@ const BasicTerminal = ({
             ws = new WebSocket(wsUrl);
             websocketRef.current = ws;
             addOutput('warning', 'Created WebSocket without protocol - authentication may fail');
+
+            // Send authentication message manually
+            setTimeout(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                console.log('Sending manual authentication message');
+                ws.send(JSON.stringify({
+                  type: 'auth',
+                  sessionId: sessionId
+                }));
+                addOutput('info', 'Sent manual authentication message');
+              }
+            }, 1000); // Wait 1 second before sending auth message
           } catch (fallbackError) {
             console.error('Error creating WebSocket without protocol:', fallbackError);
             addOutput('error', `Error creating WebSocket without protocol: ${fallbackError.message}`);
@@ -136,16 +159,51 @@ const BasicTerminal = ({
         const heartbeatInterval = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             // Send a ping message
-            ws.send(JSON.stringify({ type: 'ping' }));
-            console.log('Sent heartbeat ping');
+            try {
+              ws.send(JSON.stringify({ type: 'ping' }));
+              console.log('Sent heartbeat ping');
+
+              // Check if we've received a pong recently
+              const lastPongTime = websocketRef.current.lastPongTime || 0;
+              const now = Date.now();
+
+              // If we haven't received a pong in 30 seconds, consider the connection dead
+              if (lastPongTime > 0 && now - lastPongTime > 30000) {
+                console.warn('No pong received in 30 seconds, connection may be dead');
+                addOutput('warning', 'No response from server in 30 seconds, connection may be dead');
+
+                // Try to reconnect
+                try {
+                  ws.close(1000, 'No pong received');
+                  addOutput('info', 'Attempting to reconnect...');
+
+                  // Clear the interval before reconnecting
+                  clearInterval(heartbeatInterval);
+
+                  // Wait a moment before reconnecting
+                  setTimeout(() => {
+                    if (!websocketRef.current || websocketRef.current.readyState !== WebSocket.OPEN) {
+                      handleConnect();
+                    }
+                  }, 2000);
+                } catch (closeError) {
+                  console.error('Error closing dead connection:', closeError);
+                }
+              }
+            } catch (pingError) {
+              console.error('Error sending heartbeat ping:', pingError);
+              clearInterval(heartbeatInterval);
+            }
           } else {
             // Clear interval if connection is closed
             clearInterval(heartbeatInterval);
+            console.log('Heartbeat stopped - connection is not open');
           }
-        }, 15000); // Send heartbeat every 15 seconds
+        }, 10000); // Send heartbeat every 10 seconds
 
-        // Store interval ID for cleanup
+        // Store interval ID and initial timestamp for cleanup and monitoring
         websocketRef.current.heartbeatInterval = heartbeatInterval;
+        websocketRef.current.lastPongTime = Date.now(); // Initialize with current time
       };
 
       ws.onmessage = (event) => {

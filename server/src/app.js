@@ -23,22 +23,44 @@ app.use(express.urlencoded({ extended: true }));
 // Compress response
 app.use(compression());
 
-// Enable CORS with specific options
+// Enable CORS with options that allow connections from any origin
 app.use(cors({
-  // Allow specific origins including localhost:3000 for development
-  origin: [
-    'https://api.infrawatch.website',
-    'http://localhost:8000',
-    'http://localhost:3000',
-    'https://localhost:3000',
-    'https://localhost:8000'
-  ],
+  // Allow any origin to connect to the API
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token', 'Sec-WebSocket-Protocol'],
+  credentials: false, // Must be false when using origin: '*'
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+}));
+
+// For routes that need credentials, use a more specific CORS configuration
+const credentialsCors = cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+
+    // List of allowed origins for credential-based requests
+    const allowedOrigins = [
+      'https://api.infrawatch.website',
+      'http://localhost:8000',
+      'http://localhost:3000',
+      'https://localhost:3000',
+      'https://localhost:8000'
+    ];
+
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token', 'Sec-WebSocket-Protocol'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
-}));
+});
 
 // Http request logger
 if (config.env !== 'test') {

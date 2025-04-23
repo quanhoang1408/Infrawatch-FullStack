@@ -141,7 +141,7 @@ class OpenSSHSessionService {
     }
   }
 
-  async handleWebSocketConnection(ws, sessionId) {
+  async handleWebSocketConnection(ws, sessionId, req) {
     const sessionData = this.sessionCache.get(sessionId);
     if (!sessionData) {
       ws.close(4001, 'Invalid session');
@@ -306,18 +306,52 @@ class OpenSSHSessionService {
       ws.on('close', (code, reason) => {
         logger.info(`WebSocket closed with code ${code} and reason: ${reason || 'No reason provided'}`);
 
+        // If this is an abnormal closure (1006), log more details
+        if (code === 1006) {
+          logger.warn('Abnormal WebSocket closure (1006) - this may indicate network issues');
+          logger.warn('Client IP: ' + req.socket.remoteAddress);
+          logger.warn('Headers: ' + JSON.stringify(req.headers));
+        }
+
         // Add a small delay before terminating the SSH process
         // This gives the SSH process time to complete authentication
         setTimeout(() => {
           logger.info('Terminating SSH process after WebSocket close');
 
-          // Terminate SSH process
-          if (sshProcess.pid) {
+          // Check if the process is still running
+          let isRunning = false;
+          try {
+            // Sending signal 0 doesn't kill the process but checks if it exists
+            process.kill(sshProcess.pid, 0);
+            isRunning = true;
+          } catch (e) {
+            // Process doesn't exist
+            isRunning = false;
+          }
+
+          // Only try to kill if it's running
+          if (isRunning && sshProcess.pid) {
             try {
-              process.kill(sshProcess.pid);
+              // Try SIGTERM first
+              process.kill(sshProcess.pid, 'SIGTERM');
+              logger.info(`Sent SIGTERM to SSH process ${sshProcess.pid}`);
+
+              // If it's still running after 500ms, try SIGKILL
+              setTimeout(() => {
+                try {
+                  process.kill(sshProcess.pid, 0); // Check if still running
+                  logger.warn(`SSH process ${sshProcess.pid} still running after SIGTERM, sending SIGKILL`);
+                  process.kill(sshProcess.pid, 'SIGKILL');
+                } catch (e) {
+                  // Process already terminated
+                  logger.info(`SSH process ${sshProcess.pid} already terminated`);
+                }
+              }, 500);
             } catch (err) {
               logger.error(`Failed to kill SSH process: ${err.message}`);
             }
+          } else {
+            logger.info(`SSH process ${sshProcess.pid} is not running`);
           }
 
           // Clean up key files

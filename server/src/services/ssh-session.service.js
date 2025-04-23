@@ -154,7 +154,7 @@ class SSHSessionService {
     }
   }
 
-  async handleWebSocketConnection(ws, sessionId) {
+  async handleWebSocketConnection(ws, sessionId, req) {
     const sessionData = this.sessionCache.get(sessionId);
     if (!sessionData) {
       ws.close(4001, 'Invalid session');

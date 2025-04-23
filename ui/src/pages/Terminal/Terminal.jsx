@@ -160,11 +160,19 @@ const Terminal = () => {
       useProxy
     });
 
-    // Try a different approach - use a secure WebSocket URL
+    // For localhost development, we need to handle WebSocket connections differently
     if (window.location.hostname === 'localhost') {
-      // For localhost, use a secure WebSocket URL
-      wsUrl = `wss://api.infrawatch.website/ws-ssh`;
-      console.log('Using secure WebSocket URL for localhost');
+      // When running on localhost, we need to use the same protocol (ws/wss) as the page
+      // to avoid mixed content issues
+      const localWsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+      // Use the API domain directly
+      wsUrl = `${localWsProtocol}//api.infrawatch.website/ws-ssh`;
+
+      // Add session ID as a query parameter as a fallback for browsers that don't support protocols
+      wsUrl = `${wsUrl}?sessionId=${sessionId}`;
+
+      console.log(`Using ${localWsProtocol} WebSocket URL for localhost:`, wsUrl);
       return wsUrl;
     }
 
