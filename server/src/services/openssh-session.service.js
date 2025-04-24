@@ -17,6 +17,17 @@ const vmService = require('./vm.service');
 const logger = require('../utils/logger');
 const config = require('../config');
 
+// Import node-pty for better terminal support
+let pty;
+try {
+  pty = require('node-pty');
+  logger.info('node-pty loaded successfully');
+} catch (error) {
+  logger.warn(`Failed to load node-pty: ${error.message}`);
+  logger.warn('Terminal will have limited functionality for interactive commands');
+  pty = null;
+}
+
 class OpenSSHSessionService {
   constructor() {
     // Cache for storing session data (TTL: 60 seconds)
@@ -182,18 +193,39 @@ class OpenSSHSessionService {
         LC_ALL: 'en_US.UTF-8'
       };
 
-      // We'll use regular child_process since node-pty requires compilation
-      // and may not be available in all environments
+      // Try to use node-pty if available for better terminal support
+      let sshProcess;
       let ptyProcess = null;
-      logger.info('Using regular child_process for SSH connection');
 
-      // Use regular child_process with improved configuration
-      const sshProcess = spawn('ssh', sshArgs, {
-        env: sshEnv,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: false, // Don't use shell to avoid issues with output
-        windowsHide: true // Hide the console window on Windows
-      });
+      if (pty) {
+        try {
+          logger.info('Using node-pty for better terminal support');
+          ptyProcess = pty.spawn('ssh', sshArgs, {
+            name: 'xterm-256color',
+            cols: 80,
+            rows: 30,
+            env: sshEnv
+          });
+
+          logger.info(`PTY process started with PID: ${ptyProcess.pid}`);
+          sshProcess = ptyProcess; // Use ptyProcess as the main process
+        } catch (ptyError) {
+          logger.error(`Failed to start PTY process: ${ptyError.message}`);
+          logger.info('Falling back to regular child_process');
+          ptyProcess = null;
+        }
+      }
+
+      // Fall back to regular child_process if PTY is not available
+      if (!ptyProcess) {
+        logger.info('Using regular child_process for SSH connection');
+        sshProcess = spawn('ssh', sshArgs, {
+          env: sshEnv,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false, // Don't use shell to avoid issues with output
+          windowsHide: true // Hide the console window on Windows
+        });
+      }
 
       // Check if process started successfully
       if (!sshProcess || !sshProcess.pid) {
@@ -228,8 +260,21 @@ class OpenSSHSessionService {
       // Define a wrapper function to handle both pty and regular process
       const writeToProcess = (data) => {
         if (ptyProcess) {
-          ptyProcess.write(data);
-          logger.debug(`Data written to pty process: ${data.toString().replace(/\r/g, '\\r').replace(/\n/g, '\\n')}`);
+          try {
+            ptyProcess.write(data);
+            logger.debug(`Data written to pty process: ${data.toString().replace(/\r/g, '\\r').replace(/\n/g, '\\n')}`);
+          } catch (writeError) {
+            logger.error(`Error writing to PTY process: ${writeError.message}`);
+            // Try to send error message to client
+            try {
+              ws.send(JSON.stringify({
+                type: 'data',
+                data: `\r\nError writing to PTY process: ${writeError.message}\r\n`
+              }));
+            } catch (wsError) {
+              logger.error(`Failed to send error to WebSocket: ${wsError.message}`);
+            }
+          }
         } else if (sshProcess.stdin && sshProcess.stdin.writable) {
           const result = sshProcess.stdin.write(data);
           logger.debug(`Data written to SSH process stdin: ${data.toString().replace(/\r/g, '\\r').replace(/\n/g, '\\n')}`);
@@ -490,6 +535,16 @@ class OpenSSHSessionService {
                 logger.debug('Sent pong response to client');
               }
               return;
+            } else if (jsonData.type === 'resize' && ptyProcess) {
+              // Handle terminal resize for PTY
+              logger.info(`Received resize request: cols=${jsonData.cols}, rows=${jsonData.rows}`);
+              try {
+                ptyProcess.resize(jsonData.cols || 80, jsonData.rows || 30);
+                logger.info('Terminal resized successfully');
+              } catch (resizeError) {
+                logger.error(`Error resizing terminal: ${resizeError.message}`);
+              }
+              return;
             } else if (jsonData.type === 'input') {
               // Handle input data from client
               const commandStr = jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t');
@@ -500,6 +555,15 @@ class OpenSSHSessionService {
               if (jsonData.data.includes('\r')) {
                 const cmd = jsonData.data.replace('\r', '').trim();
                 logger.info(`Extracted command: '${cmd}'`);
+
+                // Special handling for cd command when using PTY
+                if (cmd.startsWith('cd ') && ptyProcess) {
+                  logger.info(`Detected cd command with PTY: ${cmd}`);
+                  // Just send to PTY - it will handle directory change correctly
+                  writeToProcess(Buffer.from(jsonData.data));
+                  logger.debug('cd command written to PTY process successfully');
+                  return;
+                }
 
                 // For simple commands, try executing directly and sending result
                 // Exclude interactive commands like nano, vim, etc.
@@ -607,18 +671,33 @@ class OpenSSHSessionService {
                   writeToProcess(Buffer.from(jsonData.data));
                   logger.debug('Command written to SSH process successfully');
 
-                  // For interactive commands, send a message to the client
+                  // For interactive commands, handle differently based on whether we're using PTY
                   if (['nano', 'vim', 'vi', 'emacs', 'less', 'more', 'top', 'htop'].some(c => cmd.startsWith(c))) {
                     logger.info(`Detected interactive command: ${cmd}`);
-                    // Send a message to the client
-                    if (ws.readyState === 1) {
-                      try {
-                        ws.send(JSON.stringify({
-                          type: 'data',
-                          data: '\r\nInteractive command detected. Some features may not work properly.\r\n'
-                        }));
-                      } catch (sendError) {
-                        logger.error(`Error sending interactive command message: ${sendError.message}`);
+
+                    if (ptyProcess) {
+                      // With PTY, interactive commands should work properly
+                      if (ws.readyState === 1) {
+                        try {
+                          ws.send(JSON.stringify({
+                            type: 'data',
+                            data: '\r\nInteractive command detected. Using PTY for full terminal support.\r\n'
+                          }));
+                        } catch (sendError) {
+                          logger.error(`Error sending interactive command message: ${sendError.message}`);
+                        }
+                      }
+                    } else {
+                      // Without PTY, warn the user
+                      if (ws.readyState === 1) {
+                        try {
+                          ws.send(JSON.stringify({
+                            type: 'data',
+                            data: '\r\nInteractive command detected. Some features may not work properly without PTY.\r\n'
+                          }));
+                        } catch (sendError) {
+                          logger.error(`Error sending interactive command message: ${sendError.message}`);
+                        }
                       }
                     }
                   }
