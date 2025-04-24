@@ -396,14 +396,16 @@ const BasicTerminal = ({
               addOutput('output', JSON.stringify(data));
             }
           } catch (e) {
-            // Not JSON, treat as raw data (but ensure it's a string)
+            // Not JSON, log but don't display to avoid duplicates
             if (typeof event.data === 'string') {
-              console.log('RAW STRING DATA:');
+              console.log('RAW STRING DATA (not displayed to avoid duplicates):');
               console.log(event.data);
-              addOutput('output', event.data);
+              // Don't add to output - server should always send JSON
+              // addOutput('output', event.data);
             } else {
-              console.log('NON-STRING DATA:', typeof event.data);
-              addOutput('output', String(event.data));
+              console.log('NON-STRING DATA (not displayed to avoid duplicates):', typeof event.data);
+              // Don't add to output - server should always send JSON
+              // addOutput('output', String(event.data));
             }
           }
         } catch (e) {

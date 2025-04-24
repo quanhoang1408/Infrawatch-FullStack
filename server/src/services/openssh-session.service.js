@@ -271,7 +271,13 @@ class OpenSSHSessionService {
         // Handle pty data (combines stdout and stderr)
         ptyProcess.onData((data) => {
           if (ws.readyState === 1) { // WebSocket.OPEN
-            ws.send(Buffer.from(data));
+            // Convert to string and send as JSON
+            const dataStr = data.toString('utf8');
+            ws.send(JSON.stringify({
+              type: 'data',
+              data: dataStr
+            }));
+            logger.info(`PTY data sent as JSON (${dataStr.length} bytes)`);
           }
         });
 
@@ -448,7 +454,11 @@ class OpenSSHSessionService {
 
           // Send error message to client
           if (ws.readyState === 1) {
-            ws.send(Buffer.from(`\r\nError: ${error.message}\r\n`));
+            ws.send(JSON.stringify({
+              type: 'data',
+              data: `\r\nError: ${error.message}\r\n`
+            }));
+            logger.info('Error message sent to client as JSON');
             ws.close(4002, error.message);
           }
 
