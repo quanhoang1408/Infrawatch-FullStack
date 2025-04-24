@@ -45,9 +45,11 @@ const BasicTerminal = ({
       }
     }
 
-    // Log the output being added
-    console.log(`ADDING TO TERMINAL: ${type.toUpperCase()} (${text.length} bytes)`);
-    console.log(text);
+    // Process ANSI escape sequences for better display
+    if (typeof text === 'string') {
+      // Remove ANSI color codes but keep line breaks and other control characters
+      text = text.replace(/\x1b\[[0-9;]*[mGKH]/g, '');
+    }
 
     // Force state update with a new array reference
     setOutput(prev => {
@@ -62,7 +64,6 @@ const BasicTerminal = ({
     setTimeout(() => {
       if (terminalRef.current) {
         terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-        console.log('Scrolled terminal to bottom');
       }
     }, 10);
   };
@@ -75,6 +76,8 @@ const BasicTerminal = ({
     setError(null);
     addOutput('info', 'Connecting to terminal session...');
 
+
+
     try {
       // Get WebSocket URL
       const wsUrl = onConnect?.(vmId, sessionId);
@@ -86,22 +89,12 @@ const BasicTerminal = ({
         return;
       }
 
-      console.log('Connecting to WebSocket:', wsUrl);
       addOutput('info', `Connecting to ${wsUrl}...`);
 
       // Create WebSocket with better error handling
       let ws;
       try {
-        console.log(`Creating WebSocket connection to ${wsUrl} with protocol sessionId.${sessionId}`);
         addOutput('info', `Creating WebSocket connection with protocol sessionId.${sessionId}`);
-
-        // Add more debug information
-        console.log('Browser WebSocket support:', {
-          WebSocket: typeof WebSocket !== 'undefined',
-          protocol: window.location.protocol,
-          host: window.location.host,
-          origin: window.location.origin
-        });
 
         // Create WebSocket with the session ID as the protocol
         try {
@@ -114,13 +107,12 @@ const BasicTerminal = ({
           }
 
           // Create WebSocket with protocol
-          console.log('Creating WebSocket with protocol:', [`sessionId.${sessionId}`]);
 
           // First try: with protocol array
           try {
             ws = new WebSocket(wsUrl, [`sessionId.${sessionId}`]);
-            // Set binary type to blob for better handling
-            ws.binaryType = 'blob';
+            // Set binary type to arraybuffer for better handling
+            ws.binaryType = 'arraybuffer';
             websocketRef.current = ws;
             addOutput('info', 'WebSocket created with session protocol (array format)');
           } catch (protocolError) {
@@ -130,8 +122,8 @@ const BasicTerminal = ({
             try {
               console.log('Trying with string protocol');
               ws = new WebSocket(wsUrl, `sessionId.${sessionId}`);
-              // Set binary type to blob for better handling
-              ws.binaryType = 'blob';
+              // Set binary type to arraybuffer for better handling
+              ws.binaryType = 'arraybuffer';
               websocketRef.current = ws;
               addOutput('info', 'WebSocket created with session protocol (string format)');
             } catch (stringProtocolError) {
@@ -145,8 +137,8 @@ const BasicTerminal = ({
                 `${wsUrl}?sessionId=${sessionId}`;
 
               ws = new WebSocket(urlWithSession);
-              // Set binary type to blob for better handling
-              ws.binaryType = 'blob';
+              // Set binary type to arraybuffer for better handling
+              ws.binaryType = 'arraybuffer';
               websocketRef.current = ws;
               addOutput('info', 'WebSocket created without protocol (using URL parameter)');
             }
@@ -159,8 +151,8 @@ const BasicTerminal = ({
           try {
             console.log('Trying to create WebSocket without protocol');
             ws = new WebSocket(wsUrl);
-            // Set binary type to blob for better handling
-            ws.binaryType = 'blob';
+            // Set binary type to arraybuffer for better handling
+            ws.binaryType = 'arraybuffer';
             websocketRef.current = ws;
             addOutput('warning', 'Created WebSocket without protocol - authentication may fail');
 
@@ -182,13 +174,7 @@ const BasicTerminal = ({
           }
         }
 
-        // Log WebSocket object properties
-        console.log('WebSocket created:', {
-          url: wsUrl,
-          protocol: ws.protocol,
-          readyState: ws.readyState,
-          binaryType: ws.binaryType
-        });
+
 
         // Add a timeout to detect connection issues
         const connectionTimeout = setTimeout(() => {
@@ -219,7 +205,6 @@ const BasicTerminal = ({
 
       // Handle WebSocket events
       ws.onopen = () => {
-        console.log('WebSocket connected');
         setConnected(true);
         setConnecting(false);
         addOutput('success', 'Connected to terminal session');
@@ -232,7 +217,6 @@ const BasicTerminal = ({
 
         // Add keyboard event listener after connection is established
         if (handleKeyDownRef.current) {
-          console.log('Adding keydown event listener');
           // Remove any existing listener first to avoid duplicates
           document.removeEventListener('keydown', handleKeyDownRef.current);
           document.addEventListener('keydown', handleKeyDownRef.current);
@@ -246,17 +230,17 @@ const BasicTerminal = ({
             const hiddenInput = terminalRef.current.querySelector('.hidden-input');
             if (hiddenInput) {
               hiddenInput.focus();
-              console.log('Auto-focused hidden input');
+
             } else {
               terminalRef.current.focus();
-              console.log('Auto-focused terminal div (fallback)');
+
             }
           }, 100);
         }
 
         // Send authentication message as a backup method
         try {
-          console.log('Sending authentication message with session ID');
+
           ws.send(JSON.stringify({
             type: 'auth',
             sessionId: sessionId
@@ -271,7 +255,7 @@ const BasicTerminal = ({
             // Send a ping message
             try {
               ws.send(JSON.stringify({ type: 'ping' }));
-              console.log('Sent heartbeat ping');
+
 
               // Check if we've received a pong recently
               const lastPongTime = websocketRef.current.lastPongTime || 0;
@@ -318,59 +302,45 @@ const BasicTerminal = ({
 
       ws.onmessage = (event) => {
         try {
-          // Show important data without clearing console
-          console.log('======= WEBSOCKET MESSAGE RECEIVED =======');
-          console.log('Data type:', typeof event.data);
-          console.log('Is Blob:', event.data instanceof Blob);
-          console.log('Data length:', event.data.length || (event.data.size ? event.data.size : 'unknown'));
-
-          if (typeof event.data === 'string') {
-            console.log('RAW DATA FROM SERVER:');
-            console.log(event.data);
-          }
-
-          // Completely ignore Blob data to avoid duplicates
+          // Handle binary data
           if (event.data instanceof Blob) {
-            console.log('Ignoring Blob data to avoid duplicates');
+            const reader = new FileReader();
+            reader.onload = () => {
+              const text = reader.result;
+              const cleanText = text.replace(/\x1b\[[0-9;]*[mGKH]/g, '');
+              addOutput('output', cleanText);
+            };
+            reader.readAsText(event.data);
+            return;
+          } else if (event.data instanceof ArrayBuffer) {
+            try {
+              const decoder = new TextDecoder('utf-8');
+              const text = decoder.decode(event.data);
+              const cleanText = text.replace(/\x1b\[[0-9;]*[mGKH]/g, '');
+              addOutput('output', cleanText);
+            } catch (error) {
+              console.error('Error decoding ArrayBuffer:', error);
+            }
             return;
           }
 
           // Try to parse as JSON
-          try {
-            const data = JSON.parse(event.data);
-            console.log('PARSED JSON DATA:');
-            console.log(data);
-
-            // Handle different message types
-            if (data.type === 'data') {
-              // Regular data message
-              console.log('DATA CONTENT:');
-              console.log(data.data);
-
-              // Make sure data.data is a string
-              const outputText = typeof data.data === 'string' ? data.data : String(data.data);
-
-              // Add to terminal output
-              addOutput('output', outputText);
-            } else if (data.type === 'pong') {
-              // Pong response from server - no need to log
-              websocketRef.current.lastPongTime = Date.now();
-            } else {
-              // Unknown message type
-              console.log('Unknown message type:', data.type);
-              addOutput('output', JSON.stringify(data));
-            }
-          } catch (e) {
-            // Not JSON, log but don't display to avoid duplicates
-            if (typeof event.data === 'string') {
-              console.log('RAW STRING DATA (not displayed to avoid duplicates):');
-              console.log(event.data);
-              // Don't add to output - server should always send JSON
-              // addOutput('output', event.data);
-            } else {
-              console.log('NON-STRING DATA (not displayed to avoid duplicates):', typeof event.data);
-              // Don't add to output - server should always send JSON
-              // addOutput('output', String(event.data));
+          if (typeof event.data === 'string') {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'data') {
+                const outputText = typeof data.data === 'string' ? data.data : String(data.data);
+                const cleanText = outputText.replace(/\x1b\[[0-9;]*[mGKH]/g, '');
+                addOutput('output', cleanText);
+              } else if (data.type === 'pong') {
+                websocketRef.current.lastPongTime = Date.now();
+              } else {
+                const outputText = JSON.stringify(data);
+                addOutput('output', outputText);
+              }
+            } catch (e) {
+              const cleanText = event.data.replace(/\x1b\[[0-9;]*[mGKH]/g, '');
+              addOutput('output', cleanText);
             }
           }
         } catch (e) {
@@ -437,17 +407,7 @@ const BasicTerminal = ({
       };
 
       ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
         setConnected(false);
-
-        // Log detailed information about the connection
-        console.log('WebSocket close details:', {
-          url: wsUrl,
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-          timestamp: new Date().toISOString()
-        });
 
         // Provide more helpful information based on the close code
         let closeReason = event.reason || 'Unknown reason';
@@ -680,33 +640,21 @@ const BasicTerminal = ({
         data = key;
       }
 
-      // Update the current input line
-      updateCurrentInput(data);
-
-      // Only send to server on Enter key
-      if (data === '\r') {
-        // Send the entire command at once
-        try {
-          // First try sending as JSON format (preferred)
-          try {
-            const jsonData = JSON.stringify({
-              type: 'input',
-              data: currentInput + '\r'
-            });
-            websocketRef.current.send(jsonData);
-            console.log('COMMAND SENT:', currentInput);
-          } catch (jsonError) {
-            console.error('Error sending command as JSON:', jsonError);
-
-            // Fallback to raw format
-            const command = currentInput + '\r';
-            websocketRef.current.send(command);
-            console.log('COMMAND SENT (raw):', currentInput);
-          }
-        } catch (error) {
-          console.error('Error sending command:', error);
-        }
+      // For all keys, send directly to server
+      // This ensures that terminal functionality like arrow keys, tab completion, etc. work properly
+      try {
+        // Send as JSON format
+        const jsonData = JSON.stringify({
+          type: 'input',
+          data: data
+        });
+        websocketRef.current.send(jsonData);
+      } catch (error) {
+        console.error('Error sending data:', error);
       }
+
+      // Update the current input line for display purposes
+      updateCurrentInput(data);
     }
   }, [connected, currentInput, updateCurrentInput, addOutput]);
 
@@ -725,7 +673,6 @@ const BasicTerminal = ({
         // Use requestAnimationFrame to ensure DOM has updated
         requestAnimationFrame(() => {
           terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-          console.log('Scrolled terminal to bottom');
         });
       } catch (error) {
         console.error('Error scrolling terminal to bottom:', error);
@@ -768,7 +715,7 @@ const BasicTerminal = ({
           rows: Math.max(rows, 24)  // Minimum 24 rows
         }));
 
-        console.log(`Terminal resized: ${cols}x${rows}`);
+
       } catch (error) {
         console.error('Error sending terminal resize:', error);
       }
@@ -802,7 +749,6 @@ const BasicTerminal = ({
           // Clear heartbeat interval if it exists
           if (websocketRef.current.heartbeatInterval) {
             clearInterval(websocketRef.current.heartbeatInterval);
-            console.log('Cleared heartbeat interval');
           }
 
           // Close WebSocket connection

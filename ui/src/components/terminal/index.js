@@ -5,6 +5,9 @@ import ConnectionStatus from './ConnectionStatus';
 import CommandHistory from './CommandHistory';
 import TerminalContextMenu from './TerminalContextMenu';
 import TerminalSettings from './TerminalSettings';
+import XTerminal from './XTerminal';
+import BasicTerminal from './BasicTerminal';
+import ReactXTerm from './ReactXTerm';
 
 export {
   Terminal,
@@ -12,7 +15,10 @@ export {
   ConnectionStatus,
   CommandHistory,
   TerminalContextMenu,
-  TerminalSettings
+  TerminalSettings,
+  XTerminal,
+  BasicTerminal,
+  ReactXTerm
 };
 
 export default {
@@ -21,5 +27,8 @@ export default {
   ConnectionStatus,
   CommandHistory,
   TerminalContextMenu,
-  TerminalSettings
+  TerminalSettings,
+  XTerminal,
+  BasicTerminal,
+  ReactXTerm
 };

@@ -177,7 +177,7 @@ class OpenSSHSessionService {
         '-o', 'ServerAliveCountMax=3', // Number of alive messages without response
         '-o', 'ConnectTimeout=30', // Connection timeout in seconds
         '-o', 'SendEnv=TERM', // Send terminal environment
-        '-tt', // Force pseudo-terminal allocation (double -t for non-interactive stdin)
+        '-tt', // Force pseudo-terminal allocation - essential for proper terminal behavior
         `${sessionData.sshUser}@${sessionData.targetIp}`
       ];
 
@@ -204,6 +204,7 @@ class OpenSSHSessionService {
             name: 'xterm-256color',
             cols: 80,
             rows: 30,
+            cwd: '/home/' + sessionData.sshUser, // Set initial working directory
             env: sshEnv
           });
 
@@ -366,26 +367,13 @@ class OpenSSHSessionService {
         // Log initial state
         logger.info(`SSH process initial state: PID=${sshProcess.pid}, killed=${sshProcess.killed}, exitCode=${sshProcess.exitCode}`);
 
-        // Send a direct message to client to confirm handler setup
-        if (ws.readyState === 1) {
-          try {
-            ws.send(JSON.stringify({
-              type: 'data',
-              data: '\r\nSSH connection established. Terminal ready.\r\n'
-            }));
-            logger.info('Sent initial connection message to client');
-          } catch (msgError) {
-            logger.error(`Failed to send initial message: ${msgError.message}`);
-          }
-        }
+        // For non-PTY connections, don't send initial message that might interfere with command output
+
         // Handle SSH process stdout
         sshProcess.stdout.on('data', (data) => {
           // Always log stdout data regardless of WebSocket state
           const dataStr = data.toString('utf8');
-          logger.info(`SSH stdout data received (${dataStr.length} bytes): ${dataStr.substring(0, 100)}${dataStr.length > 100 ? '...' : ''}`);
-
-          // Log raw buffer data for debugging
-          logger.info(`Raw buffer data: ${Buffer.from(data).toString('hex').substring(0, 100)}`);
+          logger.debug(`SSH stdout data received (${dataStr.length} bytes)`);
 
           if (ws.readyState === 1) { // WebSocket.OPEN
             try {
@@ -396,18 +384,9 @@ class OpenSSHSessionService {
               });
 
               ws.send(jsonData);
-              logger.info(`Data sent as JSON (${dataStr.length} bytes)`);
+              logger.debug(`Data sent as JSON (${dataStr.length} bytes)`);
             } catch (error) {
               logger.error(`Error sending stdout data: ${error.message}`);
-              // Last resort - try to send a simple text message
-              try {
-                ws.send(JSON.stringify({
-                  type: 'data',
-                  data: 'Output received but could not be displayed. Check server logs.'
-                }));
-              } catch (finalError) {
-                logger.error(`Final error sending data: ${finalError.message}`);
-              }
             }
           } else {
             logger.warn(`Cannot send stdout data: WebSocket not open (readyState: ${ws.readyState})`);
@@ -417,7 +396,7 @@ class OpenSSHSessionService {
         // Handle SSH process stderr
         sshProcess.stderr.on('data', (data) => {
           const stderr = data.toString();
-          logger.info(`SSH stderr (${stderr.length} bytes): ${stderr.substring(0, 100)}${stderr.length > 100 ? '...' : ''}`);
+          logger.debug(`SSH stderr (${stderr.length} bytes)`);
 
           // Send stderr to client as well
           if (ws.readyState === 1) {
@@ -429,18 +408,9 @@ class OpenSSHSessionService {
               });
 
               ws.send(jsonData);
-              logger.info(`Stderr data sent as JSON (${stderr.length} bytes)`);
+              logger.debug(`Stderr data sent as JSON (${stderr.length} bytes)`);
             } catch (error) {
               logger.error(`Error sending stderr data: ${error.message}`);
-              // Last resort - try to send a simple text message
-              try {
-                ws.send(JSON.stringify({
-                  type: 'data',
-                  data: 'Stderr output received but could not be displayed. Check server logs.'
-                }));
-              } catch (finalError) {
-                logger.error(`Final error sending stderr data: ${finalError.message}`);
-              }
             }
           } else {
             logger.warn(`Cannot send stderr data: WebSocket not open (readyState: ${ws.readyState})`);
@@ -520,164 +490,12 @@ class OpenSSHSessionService {
               const commandStr = jsonData.data.replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t');
               logger.info(`Received command: ${commandStr}`);
 
-              // Check if it's a simple command that we can execute directly
-              logger.info(`Checking if command is simple: ${jsonData.data}`);
-              if (jsonData.data.includes('\r')) {
-                const cmd = jsonData.data.replace('\r', '').trim();
-                logger.info(`Extracted command: '${cmd}'`);
+              logger.info(`Writing command to SSH process: ${commandStr}`);
+              writeToProcess(Buffer.from(jsonData.data));
+              logger.debug('Command written to SSH process successfully');
 
-                // Special handling for cd command when using PTY
-                if (cmd.startsWith('cd ') && ptyProcess) {
-                  logger.info(`Detected cd command with PTY: ${cmd}`);
-                  // Just send to PTY - it will handle directory change correctly
-                  writeToProcess(Buffer.from(jsonData.data));
-                  logger.debug('cd command written to PTY process successfully');
-                  return;
-                }
-
-                // For simple commands, try executing directly and sending result
-                // Exclude interactive commands like nano, vim, etc.
-                if (['ls', 'pwd', 'whoami', 'hostname', 'date', 'echo', 'cat', 'ps', 'free', 'df', 'du', 'uname', 'id', 'uptime', 'w', 'who', 'last', 'netstat', 'ifconfig', 'ip'].some(c => cmd.startsWith(c)) &&
-                    !['nano', 'vim', 'vi', 'emacs', 'less', 'more', 'top', 'htop', 'tail -f'].some(c => cmd.startsWith(c))) {
-                  logger.info(`Detected simple command: ${cmd}`);
-                  try {
-                    // Still send the command to the SSH process
-                    logger.debug(`Writing command to SSH process: ${commandStr}`);
-                    writeToProcess(Buffer.from(jsonData.data));
-                    logger.debug('Command written to SSH process successfully');
-
-                    // But also execute locally as a fallback
-                    const { exec } = require('child_process');
-                    logger.info(`Executing command directly as fallback: ${cmd}`);
-
-                    // Log the command and parameters for debugging
-                    logger.info(`SSH command: ssh -i ${sessionData.keyPath} -o CertificateFile=${sessionData.certPath} -o StrictHostKeyChecking=no ${sessionData.sshUser}@${sessionData.targetIp} "${cmd}"`);
-
-                    // Execute the command with a timeout
-                    exec(`ssh -i ${sessionData.keyPath} -o CertificateFile=${sessionData.certPath} -o StrictHostKeyChecking=no ${sessionData.sshUser}@${sessionData.targetIp} "${cmd}"`,
-                      { timeout: 10000 }, (error, stdout, stderr) => {
-                        if (error) {
-                          logger.error(`Error executing command directly: ${error.message}`);
-                          // Send error message to client
-                          if (ws.readyState === 1) {
-                            try {
-                              ws.send(JSON.stringify({
-                                type: 'data',
-                                data: `Error executing command: ${error.message}\r\n`
-                              }));
-                              logger.info('Error message sent to client');
-                            } catch (sendError) {
-                              logger.error(`Error sending error message: ${sendError.message}`);
-                            }
-                          }
-                          return;
-                        }
-
-                        if (stdout) {
-                          logger.info(`Direct command stdout: ${stdout}`);
-                          // Send the result to the client
-                          if (ws.readyState === 1) {
-                            try {
-                              // Send as JSON only to avoid duplicate output
-                              ws.send(JSON.stringify({
-                                type: 'data',
-                                data: stdout + '\r\n'
-                              }));
-                              logger.info('Direct command result sent to client as JSON');
-                            } catch (sendError) {
-                              logger.error(`Error sending direct command result: ${sendError.message}`);
-                            }
-                          }
-                        } else {
-                          logger.warn('Command executed successfully but returned no stdout');
-                          // Send a message to the client indicating no output
-                          if (ws.readyState === 1) {
-                            try {
-                              ws.send(JSON.stringify({
-                                type: 'data',
-                                data: 'Command executed successfully but returned no output\r\n'
-                              }));
-                            } catch (sendError) {
-                              logger.error(`Error sending no-output message: ${sendError.message}`);
-                            }
-                          }
-                        }
-
-                        if (stderr) {
-                          logger.info(`Direct command stderr: ${stderr}`);
-                          // Send stderr to client as well
-                          if (ws.readyState === 1) {
-                            try {
-                              // Send as JSON only to avoid duplicate output
-                              ws.send(JSON.stringify({
-                                type: 'data',
-                                data: stderr + '\r\n'
-                              }));
-                              logger.info('Direct command stderr sent to client as JSON');
-                            } catch (sendError) {
-                              logger.error(`Error sending direct command stderr: ${sendError.message}`);
-                            }
-                          }
-                        }
-                    });
-                  } catch (execError) {
-                    logger.error(`Error setting up direct command execution: ${execError.message}`);
-                    // Send error message to client
-                    if (ws.readyState === 1) {
-                      try {
-                        ws.send(JSON.stringify({
-                          type: 'data',
-                          data: `Error executing command: ${execError.message}\r\n`
-                        }));
-                        logger.info('Error message sent to client');
-                      } catch (sendError) {
-                        logger.error(`Error sending error message: ${sendError.message}`);
-                      }
-                    }
-                  }
-                } else {
-                  // For complex commands, just send to SSH process
-                  logger.debug(`Writing command to SSH process: ${commandStr}`);
-                  writeToProcess(Buffer.from(jsonData.data));
-                  logger.debug('Command written to SSH process successfully');
-
-                  // For interactive commands, handle differently based on whether we're using PTY
-                  if (['nano', 'vim', 'vi', 'emacs', 'less', 'more', 'top', 'htop'].some(c => cmd.startsWith(c))) {
-                    logger.info(`Detected interactive command: ${cmd}`);
-
-                    if (ptyProcess) {
-                      // With PTY, interactive commands should work properly
-                      if (ws.readyState === 1) {
-                        try {
-                          ws.send(JSON.stringify({
-                            type: 'data',
-                            data: '\r\nInteractive command detected. Using PTY for full terminal support.\r\n'
-                          }));
-                        } catch (sendError) {
-                          logger.error(`Error sending interactive command message: ${sendError.message}`);
-                        }
-                      }
-                    } else {
-                      // Without PTY, warn the user
-                      if (ws.readyState === 1) {
-                        try {
-                          ws.send(JSON.stringify({
-                            type: 'data',
-                            data: '\r\nInteractive command detected. Some features may not work properly without PTY.\r\n'
-                          }));
-                        } catch (sendError) {
-                          logger.error(`Error sending interactive command message: ${sendError.message}`);
-                        }
-                      }
-                    }
-                  }
-                }
-              } else {
-                // Not a complete command, just forward to SSH process
-                logger.debug(`Writing input to SSH process: ${commandStr}`);
-                writeToProcess(Buffer.from(jsonData.data));
-                logger.debug('Input written to SSH process successfully');
-              }
+              // For PTY, all commands including cd will work correctly
+              // For non-PTY, we don't need special handling as commands run in separate processes
               return;
             }
           } catch (jsonError) {

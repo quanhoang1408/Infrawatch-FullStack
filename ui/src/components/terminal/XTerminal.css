@@ -1,0 +1,126 @@
+.xterm-terminal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: #000;
+  color: #fff;
+  font-family: 'Menlo, Monaco, "Courier New", monospace';
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.xterm-terminal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background-color: #222;
+  border-bottom: 1px solid #333;
+}
+
+.xterm-terminal-info {
+  font-weight: bold;
+  color: #ccc;
+}
+
+.xterm-terminal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.xterm-terminal-connect-btn {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.xterm-terminal-connect-btn:hover {
+  background-color: #218838;
+}
+
+.xterm-terminal-connect-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.xterm-terminal-disconnect-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.xterm-terminal-disconnect-btn:hover {
+  background-color: #c82333;
+}
+
+.xterm-terminal-container {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  background-color: #000;
+  min-height: 400px;
+  height: 400px; /* Explicit height to avoid dimensions error */
+  width: 100%; /* Explicit width to avoid dimensions error */
+  position: relative; /* Required for xterm.js positioning */
+}
+
+.xterm-terminal-error {
+  padding: 8px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  margin: 8px;
+  border-radius: 4px;
+}
+
+.xterm-terminal-status {
+  padding: 4px 8px;
+  background-color: #222;
+  color: #ccc;
+  font-size: 12px;
+  border-top: 1px solid #333;
+}
+
+/* Make sure the terminal is responsive */
+@media (max-width: 768px) {
+  .xterm-terminal {
+    font-size: 12px;
+  }
+}
+
+/* Override xterm.js styles for better integration */
+.xterm {
+  height: 100% !important;
+  width: 100% !important;
+  position: absolute !important;
+}
+
+.xterm-viewport {
+  overflow-y: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.xterm-screen {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Fix cursor and selection */
+.xterm-cursor-layer {
+  position: absolute;
+  z-index: 1;
+}
+
+.xterm-selection-layer {
+  position: absolute;
+  z-index: 0;
+}

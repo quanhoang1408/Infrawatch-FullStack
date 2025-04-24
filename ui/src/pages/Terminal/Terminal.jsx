@@ -3,14 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Button, Form, Input, Select, Alert, Spin, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import axios from 'axios';
-// Import the BasicTerminal component
+// Import terminal component
 import BasicTerminal from '../../components/terminal/BasicTerminal';
 import useNotification from '../../hooks/useNotification';
 import { useVM } from '../../hooks/useVM';
 import api from '../../services/api';
 import { initiateSSHConnection } from '../../services/terminal.service';
 import './Terminal.scss';
-// Import the BasicTerminal styles
+// Import terminal styles
 import '../../components/terminal/BasicTerminal.scss';
 
 const { Title } = Typography;
@@ -356,7 +356,7 @@ const Terminal = () => {
           </Form>
         </Card>
       ) : (
-        <Card className="terminal-card">
+        <Card className="terminal-card" style={{ height: '500px', width: '100%' }}>
           <BasicTerminal
             vmId={vmId}
             vmName={vm?.name}
