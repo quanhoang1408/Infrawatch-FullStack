@@ -73,6 +73,11 @@
   cursor: text;
   outline: none;
   min-height: 300px;
+  user-select: text !important; /* Enable text selection */
+  -webkit-user-select: text !important; /* Safari */
+  -moz-user-select: text !important; /* Firefox */
+  -ms-user-select: text !important; /* IE/Edge */
+  position: relative; /* For absolute positioning of copy button */
 }
 
 .basic-terminal-output:focus {
@@ -100,6 +105,10 @@
 .terminal-line {
   margin: 0;
   padding: 0;
+  user-select: text !important; /* Enable text selection */
+  -webkit-user-select: text !important; /* Safari */
+  -moz-user-select: text !important; /* Firefox */
+  -ms-user-select: text !important; /* IE/Edge */
 }
 
 .terminal-line.output {
@@ -136,6 +145,40 @@
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* Hidden input for keyboard capture */
+.hidden-input {
+  position: absolute;
+  left: -9999px;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  z-index: -1; /* Ensure it's behind other elements */
+}
+
+/* Copy button */
+.copy-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.basic-terminal-output:hover .copy-button {
+  opacity: 1;
+}
+
+.copy-button:hover {
+  background-color: rgba(0, 0, 0, 0.7);
 }
 
 /* Make sure the terminal is responsive */

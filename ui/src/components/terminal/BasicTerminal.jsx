@@ -329,44 +329,9 @@ const BasicTerminal = ({
             console.log(event.data);
           }
 
-          // Check if the data is a Blob
+          // Completely ignore Blob data to avoid duplicates
           if (event.data instanceof Blob) {
-            // Handle binary data
-            const reader = new FileReader();
-            reader.onload = () => {
-              try {
-                // Convert ArrayBuffer to string
-                const text = new TextDecoder('utf-8').decode(reader.result);
-                console.log('BLOB DATA FROM SERVER:');
-                console.log(text);
-
-                // Try to parse as JSON first
-                try {
-                  const jsonData = JSON.parse(text);
-                  console.log('PARSED JSON FROM BLOB:');
-                  console.log(jsonData);
-
-                  if (jsonData.type === 'data') {
-                    // Add the data to output
-                    addOutput('output', jsonData.data);
-                  } else {
-                    // Unknown type, add the whole JSON
-                    addOutput('output', JSON.stringify(jsonData));
-                  }
-                } catch (jsonError) {
-                  // Not JSON, add as raw text
-                  addOutput('output', text);
-                }
-              } catch (blobError) {
-                console.error('Error processing binary data:', blobError);
-                addOutput('error', `Error processing binary data: ${blobError.message}`);
-              }
-            };
-            reader.onerror = (fileError) => {
-              console.error('Error reading blob:', fileError);
-              addOutput('error', 'Error reading binary data');
-            };
-            reader.readAsArrayBuffer(event.data);
+            console.log('Ignoring Blob data to avoid duplicates');
             return;
           }
 
@@ -768,6 +733,67 @@ const BasicTerminal = ({
     }
   }, [output]);
 
+  // Handle terminal resize
+  const sendTerminalResize = useCallback(() => {
+    if (connected && websocketRef.current) {
+      try {
+        // Get terminal dimensions
+        const terminalElement = terminalRef.current;
+        if (!terminalElement) return;
+
+        // Calculate approximate character dimensions based on the terminal font
+        const testChar = document.createElement('span');
+        testChar.style.fontFamily = getComputedStyle(terminalElement).fontFamily;
+        testChar.style.fontSize = getComputedStyle(terminalElement).fontSize;
+        testChar.style.position = 'absolute';
+        testChar.style.visibility = 'hidden';
+        testChar.textContent = 'X';
+        document.body.appendChild(testChar);
+
+        const charWidth = testChar.getBoundingClientRect().width;
+        const charHeight = testChar.getBoundingClientRect().height;
+        document.body.removeChild(testChar);
+
+        // Calculate columns and rows
+        const terminalWidth = terminalElement.clientWidth;
+        const terminalHeight = terminalElement.clientHeight;
+
+        const cols = Math.floor(terminalWidth / charWidth);
+        const rows = Math.floor(terminalHeight / charHeight);
+
+        // Send resize event to server
+        websocketRef.current.send(JSON.stringify({
+          type: 'resize',
+          cols: Math.max(cols, 80), // Minimum 80 columns
+          rows: Math.max(rows, 24)  // Minimum 24 rows
+        }));
+
+        console.log(`Terminal resized: ${cols}x${rows}`);
+      } catch (error) {
+        console.error('Error sending terminal resize:', error);
+      }
+    }
+  }, [connected]);
+
+  // Send terminal size on connection and window resize
+  useEffect(() => {
+    if (connected) {
+      // Send initial size
+      sendTerminalResize();
+
+      // Add resize event listener
+      const handleResize = () => {
+        sendTerminalResize();
+      };
+
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+      };
+    }
+  }, [connected, sendTerminalResize]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
@@ -795,32 +821,38 @@ const BasicTerminal = ({
 
   // Focus terminal on click
   const handleTerminalClick = (e) => {
-    // Prevent default to avoid scrolling to top
-    if (e) e.preventDefault();
+    // Don't prevent default to allow text selection
+    // if (e) e.preventDefault();
 
     if (terminalRef.current) {
-      // Focus the hidden input instead of the div
-      const hiddenInput = terminalRef.current.querySelector('.hidden-input');
-      if (hiddenInput) {
-        // Save current scroll position
-        const scrollTop = terminalRef.current.scrollTop;
+      // Only focus if we're not selecting text
+      const selection = window.getSelection();
+      if (!selection || !selection.toString()) {
+        // Focus the hidden input instead of the div
+        const hiddenInput = terminalRef.current.querySelector('.hidden-input');
+        if (hiddenInput) {
+          // Save current scroll position
+          const scrollTop = terminalRef.current.scrollTop;
 
-        hiddenInput.focus();
+          hiddenInput.focus();
 
-        // Restore scroll position after focus
-        setTimeout(() => {
-          if (terminalRef.current) {
-            terminalRef.current.scrollTop = scrollTop;
-          }
-        }, 0);
-      } else {
-        terminalRef.current.focus();
+          // Restore scroll position after focus
+          setTimeout(() => {
+            if (terminalRef.current) {
+              terminalRef.current.scrollTop = scrollTop;
+            }
+          }, 0);
+        } else {
+          terminalRef.current.focus();
+        }
       }
     }
   };
 
   // Track if terminal is focused
   const [isFocused, setIsFocused] = useState(false);
+  // Track selected text for copy
+  const [selectedText, setSelectedText] = useState('');
 
   // Handle focus and blur events
   const handleTerminalFocus = () => {
@@ -839,6 +871,67 @@ const BasicTerminal = ({
     if (e.relatedTarget !== terminalRef.current?.querySelector('.hidden-input')) {
       setIsFocused(false);
     }
+  };
+
+  // Handle text selection for copy
+  const handleMouseUp = (e) => {
+    // Don't focus the hidden input when selecting text
+    const selection = window.getSelection();
+    if (selection && selection.toString()) {
+      setSelectedText(selection.toString());
+      // Copy to clipboard if Ctrl+C is pressed
+      const handleCopy = (e) => {
+        if (e.ctrlKey && e.key === 'c') {
+          e.preventDefault();
+          navigator.clipboard.writeText(selectedText)
+            .then(() => {
+              console.log('Text copied to clipboard');
+            })
+            .catch(err => {
+              console.error('Failed to copy text: ', err);
+            });
+        }
+      };
+
+      document.addEventListener('keydown', handleCopy, { once: true });
+
+      // Prevent the terminal from focusing the hidden input
+      e.stopPropagation();
+    }
+  };
+
+  // Handle copy event
+  const handleCopy = (e) => {
+    const selection = window.getSelection();
+    if (selection && selection.toString()) {
+      e.clipboardData.setData('text/plain', selection.toString());
+      e.preventDefault();
+      console.log('Text copied to clipboard');
+    }
+  };
+
+  // Copy all terminal content
+  const copyAllContent = () => {
+    // Get all text content from terminal output
+    const terminalContent = output.map(line => line.text).join('\n');
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(terminalContent)
+      .then(() => {
+        console.log('All terminal content copied to clipboard');
+        // Show temporary success message
+        const copyButton = document.querySelector('.copy-button');
+        if (copyButton) {
+          const originalText = copyButton.textContent;
+          copyButton.textContent = 'Copied!';
+          setTimeout(() => {
+            copyButton.textContent = originalText;
+          }, 2000);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to copy terminal content: ', err);
+      });
   };
 
   return (
@@ -874,6 +967,8 @@ const BasicTerminal = ({
         onClick={handleTerminalClick}
         onFocus={handleTerminalFocus}
         onBlur={handleTerminalBlur}
+        onMouseUp={handleMouseUp}
+        onCopy={handleCopy}
         onKeyDown={(e) => {
           if (handleKeyDownRef.current) {
             handleKeyDownRef.current(e);
@@ -882,6 +977,12 @@ const BasicTerminal = ({
         tabIndex="0"
         key={renderKey} // Add render key to force re-renders
       >
+        {/* Copy button */}
+        {connected && (
+          <button className="copy-button" onClick={copyAllContent}>
+            Copy All
+          </button>
+        )}
         {/* Hidden textarea to capture keyboard events */}
         <textarea
           className="hidden-input"

@@ -389,29 +389,14 @@ class OpenSSHSessionService {
 
           if (ws.readyState === 1) { // WebSocket.OPEN
             try {
-              // Try direct string send first
-              try {
-                // Send as JSON only to avoid duplicate output
-                const jsonData = JSON.stringify({
-                  type: 'data',
-                  data: dataStr
-                });
+              // Send as JSON only
+              const jsonData = JSON.stringify({
+                type: 'data',
+                data: dataStr
+              });
 
-                ws.send(jsonData);
-                logger.info('Data sent as JSON');
-              } catch (directError) {
-                logger.error(`Error sending direct data: ${directError.message}`);
-
-                // Fall back to JSON only
-                const jsonData = JSON.stringify({
-                  type: 'data',
-                  data: dataStr
-                });
-
-                logger.info(`Sending JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
-                ws.send(jsonData);
-                logger.info('JSON data sent successfully');
-              }
+              ws.send(jsonData);
+              logger.info(`Data sent as JSON (${dataStr.length} bytes)`);
             } catch (error) {
               logger.error(`Error sending stdout data: ${error.message}`);
               // Last resort - try to send a simple text message
@@ -437,29 +422,14 @@ class OpenSSHSessionService {
           // Send stderr to client as well
           if (ws.readyState === 1) {
             try {
-              // Try direct string send first
-              try {
-                // Send as JSON only to avoid duplicate output
-                const jsonData = JSON.stringify({
-                  type: 'data',
-                  data: stderr
-                });
+              // Send as JSON only
+              const jsonData = JSON.stringify({
+                type: 'data',
+                data: stderr
+              });
 
-                ws.send(jsonData);
-                logger.info('Stderr data sent as JSON');
-              } catch (directError) {
-                logger.error(`Error sending direct stderr data: ${directError.message}`);
-
-                // Fall back to JSON only
-                const jsonData = JSON.stringify({
-                  type: 'data',
-                  data: stderr
-                });
-
-                logger.info(`Sending stderr JSON data to client: ${jsonData.substring(0, 100)}${jsonData.length > 100 ? '...' : ''}`);
-                ws.send(jsonData);
-                logger.info('Stderr JSON data sent successfully');
-              }
+              ws.send(jsonData);
+              logger.info(`Stderr data sent as JSON (${stderr.length} bytes)`);
             } catch (error) {
               logger.error(`Error sending stderr data: ${error.message}`);
               // Last resort - try to send a simple text message
