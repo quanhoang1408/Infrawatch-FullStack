@@ -1,6 +1,7 @@
 // src/services/vm.service.js
 const VM = require('../models/vm.model');
 const Provider = require('../models/provider.model');
+const VMAssignment = require('../models/vm-assignment.model');
 const { createProviderService } = require('./provider/provider.factory');
 const providerService = require('./provider.service');
 const activityService = require('./activity.service');
@@ -79,34 +80,63 @@ const syncVMs = async (providerId = null) => {
 };
 
 /**
- * Get all VMs
+ * Get all VMs based on user role and assignments
+ * @param {Object} user - User object with role
  * @returns {Promise<Array>} Array of VMs
  */
-const getVMs = async () => {
-  return VM.find();
+const getVMs = async (user = null) => {
+  // If no user is provided or user is admin/superadmin, return all VMs
+  if (!user || ['admin', 'superadmin'].includes(user.role)) {
+    return VM.find();
+  }
+
+  // For regular users, only return VMs assigned to them
+  const assignments = await VMAssignment.find({ userId: user._id });
+  const vmIds = assignments.map(assignment => assignment.vmId);
+
+  if (vmIds.length === 0) {
+    return [];
+  }
+
+  return VM.find({ _id: { $in: vmIds } });
 };
 
 /**
- * Get VM by ID
+ * Get VM by ID with permission check
  * @param {string} id - VM ID
+ * @param {Object} user - User object with role
  * @returns {Promise<Object>} VM object
  */
-const getVMById = async (id) => {
+const getVMById = async (id, user = null) => {
   const vm = await VM.findById(id);
   if (!vm) {
     throw new ApiError(404, 'VM not found');
   }
+
+  // If no user is provided or user is admin/superadmin, allow access
+  if (!user || ['admin', 'superadmin'].includes(user.role)) {
+    return vm;
+  }
+
+  // For regular users, check if VM is assigned to them
+  const assignment = await VMAssignment.findOne({ userId: user._id, vmId: id });
+  if (!assignment) {
+    throw new ApiError(403, 'You do not have permission to access this VM');
+  }
+
   return vm;
 };
 
 /**
- * Start a VM
+ * Start a VM with permission check
  * @param {string} id - VM ID
  * @param {string} userId - User ID for activity logging
+ * @param {Object} user - User object with role
  * @returns {Promise<Object>} Updated VM object
  */
-const startVM = async (id, userId) => {
-  const vm = await VM.findById(id);
+const startVM = async (id, userId, user = null) => {
+  // Get VM with permission check
+  const vm = await getVMById(id, user);
   if (!vm) {
     throw new ApiError(404, 'VM not found');
   }
@@ -158,13 +188,15 @@ const startVM = async (id, userId) => {
 };
 
 /**
- * Stop a VM
+ * Stop a VM with permission check
  * @param {string} id - VM ID
  * @param {string} userId - User ID for activity logging
+ * @param {Object} user - User object with role
  * @returns {Promise<Object>} Updated VM object
  */
-const stopVM = async (id, userId) => {
-  const vm = await VM.findById(id);
+const stopVM = async (id, userId, user = null) => {
+  // Get VM with permission check
+  const vm = await getVMById(id, user);
   if (!vm) {
     throw new ApiError(404, 'VM not found');
   }
@@ -216,13 +248,15 @@ const stopVM = async (id, userId) => {
 };
 
 /**
- * Reboot a VM
+ * Reboot a VM with permission check
  * @param {string} id - VM ID
  * @param {string} userId - User ID for activity logging
+ * @param {Object} user - User object with role
  * @returns {Promise<Object>} Updated VM object
  */
-const rebootVM = async (id, userId) => {
-  const vm = await VM.findById(id);
+const rebootVM = async (id, userId, user = null) => {
+  // Get VM with permission check
+  const vm = await getVMById(id, user);
   if (!vm) {
     throw new ApiError(404, 'VM not found');
   }

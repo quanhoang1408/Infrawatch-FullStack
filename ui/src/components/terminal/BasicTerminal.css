@@ -61,6 +61,7 @@
   background-color: #c82333;
 }
 
+
 .basic-terminal-output {
   flex: 1;
   padding: 8px;
@@ -78,6 +79,7 @@
   -moz-user-select: text !important; /* Firefox */
   -ms-user-select: text !important; /* IE/Edge */
   position: relative; /* For absolute positioning of copy button */
+  scroll-behavior: smooth;
 }
 
 .basic-terminal-output:focus {

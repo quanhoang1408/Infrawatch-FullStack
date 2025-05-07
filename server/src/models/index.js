@@ -6,6 +6,7 @@ const Monitoring = require('./monitoring.model');
 const Activity = require('./activity.model');
 const Provider = require('./provider.model');
 const Command = require('./command.model');
+const VMAssignment = require('./vm-assignment.model');
 // Import additional models as needed
 
 module.exports = {
@@ -16,4 +17,5 @@ module.exports = {
   Activity,
   Provider,
   Command,
+  VMAssignment,
 };

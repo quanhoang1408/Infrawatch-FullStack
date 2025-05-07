@@ -506,26 +506,15 @@ const BasicTerminal = ({
     }
 
     try {
-      // Send each character with a small delay to simulate typing
-      let i = 0;
-      const sendNextChar = () => {
-        if (i < command.length) {
-          const char = command[i++];
-          websocketRef.current.send(JSON.stringify({
-            type: 'input',
-            data: char
-          }));
-          setTimeout(sendNextChar, 10);
-        } else {
-          // Send Enter at the end
-          websocketRef.current.send(JSON.stringify({
-            type: 'input',
-            data: '\r'
-          }));
-        }
-      };
+      // Send the entire command at once
+      websocketRef.current.send(JSON.stringify({
+        type: 'input',
+        data: command + '\r'
+      }));
 
-      sendNextChar();
+      // Update current input for visual feedback
+      setCurrentInput('');
+
       return true;
     } catch (error) {
       console.error('Error sending command:', error);
@@ -552,10 +541,7 @@ const BasicTerminal = ({
   // Update current input line
   const updateCurrentInput = useCallback((key) => {
     if (key === '\r') {
-      // Enter key - submit command
-      // Add the command to output
-      addOutput('command', `$ ${currentInput}`);
-      // Clear current input
+      // Enter key - clear current input (don't add to output yet)
       setCurrentInput('');
     } else if (key === '\u007F') {
       // Backspace - remove last character
@@ -564,7 +550,7 @@ const BasicTerminal = ({
       // Regular character - add to input
       setCurrentInput(prev => prev + key);
     }
-  }, [currentInput, addOutput]);
+  }, []);
 
   // Handle key down events - memoized to avoid dependency issues
   const handleKeyDown = useCallback((event) => {
@@ -572,13 +558,14 @@ const BasicTerminal = ({
       return;
     }
 
-    // Always process key events when connected
-    // We're relying on the hidden textarea to capture all keyboard input
+    // Allow Ctrl+C for copy
+    if (event.ctrlKey && event.key === 'c' && window.getSelection().toString()) {
+      return; // Let browser handle copy
+    }
 
     // Send key to server
     const key = event.key;
     const ctrl = event.ctrlKey;
-    const alt = event.altKey;
 
     // Handle special keys and combinations
     if (key.length === 1 ||
@@ -612,6 +599,23 @@ const BasicTerminal = ({
         }
       } else if (key === 'Enter') {
         data = '\r';
+
+        // When Enter is pressed, send the entire current input followed by Enter
+        if (currentInput.length > 0) {
+          try {
+            // Send the entire command at once
+            websocketRef.current.send(JSON.stringify({
+              type: 'input',
+              data: currentInput + '\r'
+            }));
+
+            // Update current input for visual feedback
+            updateCurrentInput(data);
+            return;
+          } catch (error) {
+            console.error('Error sending command:', error);
+          }
+        }
       } else if (key === 'Backspace') {
         data = '\u007F'; // Delete character
       } else if (key === 'Delete') {
@@ -640,23 +644,23 @@ const BasicTerminal = ({
         data = key;
       }
 
-      // For all keys, send directly to server
-      // This ensures that terminal functionality like arrow keys, tab completion, etc. work properly
-      try {
-        // Send as JSON format
-        const jsonData = JSON.stringify({
-          type: 'input',
-          data: data
-        });
-        websocketRef.current.send(jsonData);
-      } catch (error) {
-        console.error('Error sending data:', error);
+      // For special keys (not regular typing), send directly to server
+      if (key !== 'Enter' && (key.length > 1 || ctrl)) {
+        try {
+          websocketRef.current.send(JSON.stringify({
+            type: 'input',
+            data: data
+          }));
+        } catch (error) {
+          console.error('Error sending data:', error);
+        }
       }
 
-      // Update the current input line for display purposes
+      // Only update current input for visual feedback
+      // Don't add to output until server echoes it back
       updateCurrentInput(data);
     }
-  }, [connected, currentInput, updateCurrentInput, addOutput]);
+  }, [connected, updateCurrentInput, currentInput]);
 
   // Note: addOutput function has been moved above handleConnect to fix the reference error
 
@@ -664,6 +668,25 @@ const BasicTerminal = ({
   useEffect(() => {
     handleKeyDownRef.current = handleKeyDown;
   }, [handleKeyDown]);
+
+  // Fix scrolling behavior when clicking
+  useEffect(() => {
+    const handleScroll = (e) => {
+      if (e.target.tagName === 'TEXTAREA') {
+        e.preventDefault();
+      }
+    };
+
+    if (terminalRef.current) {
+      terminalRef.current.addEventListener('scroll', handleScroll, { passive: false });
+    }
+
+    return () => {
+      if (terminalRef.current) {
+        terminalRef.current.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, []);
 
   // Scroll to bottom when output changes
   useEffect(() => {
@@ -766,31 +789,27 @@ const BasicTerminal = ({
   }, []);
 
   // Focus terminal on click
-  const handleTerminalClick = (e) => {
-    // Don't prevent default to allow text selection
-    // if (e) e.preventDefault();
+  const handleTerminalClick = () => {
+    // Check if user is selecting text
+    const selection = window.getSelection();
+    const hasSelection = selection && selection.toString();
 
-    if (terminalRef.current) {
-      // Only focus if we're not selecting text
-      const selection = window.getSelection();
-      if (!selection || !selection.toString()) {
-        // Focus the hidden input instead of the div
-        const hiddenInput = terminalRef.current.querySelector('.hidden-input');
-        if (hiddenInput) {
-          // Save current scroll position
-          const scrollTop = terminalRef.current.scrollTop;
+    // Only handle focus if not selecting text
+    if (!hasSelection && terminalRef.current) {
+      // Save current scroll position
+      const scrollTop = terminalRef.current.scrollTop;
 
-          hiddenInput.focus();
+      // Focus the hidden input
+      const hiddenInput = terminalRef.current.querySelector('.hidden-input');
+      if (hiddenInput) {
+        hiddenInput.focus({ preventScroll: true });
 
-          // Restore scroll position after focus
-          setTimeout(() => {
-            if (terminalRef.current) {
-              terminalRef.current.scrollTop = scrollTop;
-            }
-          }, 0);
-        } else {
-          terminalRef.current.focus();
-        }
+        // Restore scroll position
+        requestAnimationFrame(() => {
+          if (terminalRef.current) {
+            terminalRef.current.scrollTop = scrollTop;
+          }
+        });
       }
     }
   };
@@ -801,13 +820,14 @@ const BasicTerminal = ({
   const [selectedText, setSelectedText] = useState('');
 
   // Handle focus and blur events
-  const handleTerminalFocus = () => {
+  const handleTerminalFocus = (e) => {
+    e.preventDefault(); // Prevent scroll jumping
     setIsFocused(true);
-    // Focus the hidden textarea
+    // Focus the hidden textarea without scrolling
     setTimeout(() => {
       const textarea = terminalRef.current?.querySelector('.hidden-input');
       if (textarea && document.activeElement !== textarea) {
-        textarea.focus();
+        textarea.focus({ preventScroll: true });
       }
     }, 0);
   };
@@ -937,6 +957,8 @@ const BasicTerminal = ({
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
+          tabIndex="-1"
+          aria-hidden="true"
           onKeyDown={(e) => {
             e.stopPropagation();
             if (handleKeyDownRef.current) {
@@ -951,12 +973,15 @@ const BasicTerminal = ({
             // Clear the textarea after each input to avoid accumulation
             e.target.value = '';
           }}
+          onFocus={(e) => {
+            e.preventDefault();
+          }}
           onBlur={() => {
             // Re-focus if terminal is still focused
             if (isFocused && connected) {
               setTimeout(() => {
                 const textarea = terminalRef.current?.querySelector('.hidden-input');
-                if (textarea) textarea.focus();
+                if (textarea) textarea.focus({ preventScroll: true });
               }, 10);
             }
           }}

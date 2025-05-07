@@ -19,6 +19,7 @@ router
   .route('/sync')
   .post(
     auth(),
+    rbac(['admin', 'superadmin']),
     validate(vmValidation.syncVMs),
     vmController.syncVMs
   );

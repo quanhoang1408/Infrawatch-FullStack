@@ -3,28 +3,29 @@ const { vm: vmService, command: commandService, vault: vaultService } = require(
 const { asyncHandler } = require('../../../utils/asyncHandler');
 
 /**
- * Get all VMs
+ * Get all VMs based on user role and permissions
  */
 const getVMs = asyncHandler(async (req, res) => {
   // Optional: Sync VMs from providers before returning
-  if (req.query.sync === 'true') {
+  if (req.query.sync === 'true' && ['admin', 'superadmin'].includes(req.user.role)) {
     await vmService.syncVMs();
   }
 
-  const vms = await vmService.getVMs();
+  // Pass user object to filter VMs based on role and assignments
+  const vms = await vmService.getVMs(req.user);
   res.send(vms);
 });
 
 /**
- * Get VM by ID
+ * Get VM by ID with permission check
  */
 const getVM = asyncHandler(async (req, res) => {
-  const vm = await vmService.getVMById(req.params.vmId);
+  const vm = await vmService.getVMById(req.params.vmId, req.user);
   res.send(vm);
 });
 
 /**
- * Sync VMs from providers
+ * Sync VMs from providers (admin only)
  */
 const syncVMs = asyncHandler(async (req, res) => {
   const providerId = req.query.providerId;
@@ -33,44 +34,44 @@ const syncVMs = asyncHandler(async (req, res) => {
 });
 
 /**
- * Start VM
+ * Start VM with permission check
  */
 const startVM = asyncHandler(async (req, res) => {
-  await vmService.startVM(req.params.vmId, req.user._id);
+  await vmService.startVM(req.params.vmId, req.user._id, req.user);
   res.status(202).send({
     message: `Start request accepted for VM ${req.params.vmId}`,
   });
 });
 
 /**
- * Stop VM
+ * Stop VM with permission check
  */
 const stopVM = asyncHandler(async (req, res) => {
-  await vmService.stopVM(req.params.vmId, req.user._id);
+  await vmService.stopVM(req.params.vmId, req.user._id, req.user);
   res.status(202).send({
     message: `Stop request accepted for VM ${req.params.vmId}`,
   });
 });
 
 /**
- * Reboot VM
+ * Reboot VM with permission check
  */
 const rebootVM = asyncHandler(async (req, res) => {
-  await vmService.rebootVM(req.params.vmId, req.user._id);
+  await vmService.rebootVM(req.params.vmId, req.user._id, req.user);
   res.status(202).send({
     message: `Reboot request accepted for VM ${req.params.vmId}`,
   });
 });
 
 /**
- * Update SSH key for VM
+ * Update SSH key for VM (admin only)
  */
 const updateSSHKey = asyncHandler(async (req, res) => {
   const { vmId } = req.params;
   const { sshUser } = req.body;
 
-  // Get VM to verify it exists
-  const vm = await vmService.getVMById(vmId);
+  // Get VM to verify it exists (admin check is done in the route middleware)
+  await vmService.getVMById(vmId, req.user);
 
   // Generate SSH key using Vault
   const sshKeyData = await vaultService.signSSHKey(sshUser, vmId);

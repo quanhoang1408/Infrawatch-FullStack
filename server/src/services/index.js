@@ -7,6 +7,8 @@ const monitoringService = require('./monitoring.service');
 const agentService = require('./agent.service');
 const commandService = require('./command.service');
 const vaultService = require('./vault.service');
+const userService = require('./user.service');
+const vmAssignmentService = require('./vm-assignment.service');
 // Import additional services as needed
 
 module.exports = {
@@ -18,4 +20,6 @@ module.exports = {
   agent: agentService,
   command: commandService,
   vault: vaultService,
+  user: userService,
+  vmAssignment: vmAssignmentService,
 };
