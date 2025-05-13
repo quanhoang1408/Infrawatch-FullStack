@@ -11,7 +11,7 @@ const bcrypt = require('bcryptjs');
 const createUser = async (userBody) => {
   // Check if email already exists
   if (await User.findOne({ email: userBody.email })) {
-    throw new ApiError(409, 'Email already taken');
+    throw new ApiError(409, 'Email đã được sử dụng');
   }
 
   // Create user
@@ -35,7 +35,7 @@ const getUsers = async () => {
 const getUserById = async (id) => {
   const user = await User.findById(id);
   if (!user) {
-    throw new ApiError(404, 'User not found');
+    throw new ApiError(404, 'Không tìm thấy người dùng');
   }
   return user;
 };
@@ -51,7 +51,7 @@ const updateUserById = async (id, updateBody) => {
 
   // If updating email, check if it's already taken
   if (updateBody.email && (await User.findOne({ email: updateBody.email, _id: { $ne: id } }))) {
-    throw new ApiError(409, 'Email already taken');
+    throw new ApiError(409, 'Email đã được sử dụng bởi người dùng khác');
   }
 
   // If updating password, hash it
@@ -71,8 +71,28 @@ const updateUserById = async (id, updateBody) => {
  * @returns {Promise<boolean>} True if deleted
  */
 const deleteUserById = async (id) => {
+  const { VMAssignment, Token, Activity, Command } = require('../models');
   const user = await getUserById(id);
-  await user.remove();
+
+  // Kiểm tra xem người dùng có VM assignments không
+  const vmAssignments = await VMAssignment.find({ userId: id });
+  if (vmAssignments.length > 0) {
+    throw new ApiError(400, 'Không thể xóa người dùng vì họ đang được gán quyền truy cập vào một số máy ảo. Vui lòng xóa các phân quyền trước.');
+  }
+
+  // Xóa tất cả tokens liên quan đến người dùng
+  await Token.deleteMany({ user: id });
+
+  // Cập nhật hoạt động để không tham chiếu đến người dùng đã xóa
+  // Không xóa hoạt động vì chúng vẫn có giá trị lịch sử
+  await Activity.updateMany({ user: id }, { $unset: { user: 1 } });
+
+  // Cập nhật lệnh để không tham chiếu đến người dùng đã xóa
+  await Command.updateMany({ createdBy: id }, { $unset: { createdBy: 1 } });
+
+  // Xóa người dùng
+  await User.deleteOne({ _id: id });
+
   return true;
 };
 
