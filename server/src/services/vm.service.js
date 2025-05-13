@@ -14,68 +14,92 @@ const sseService = require('./sse.service');
  * @returns {Promise<Array>} Array of VMs
  */
 const syncVMs = async (providerId = null) => {
+  console.log(`[Sync] Starting VM sync ${providerId ? `for provider ID: ${providerId}` : 'for all providers'}`);
+
   // Get providers to sync
   let providers;
   if (providerId) {
     const provider = await Provider.findById(providerId);
     if (!provider) {
+      console.error(`[Sync] Provider not found with ID: ${providerId}`);
       throw new ApiError(404, 'Provider not found');
     }
     providers = [provider];
+    console.log(`[Sync] Found provider: ${provider.name} (${provider.type})`);
   } else {
     providers = await Provider.find({ status: 'active' });
+    console.log(`[Sync] Found ${providers.length} active providers`);
   }
 
   // Process each provider
   const results = [];
   for (const provider of providers) {
     try {
+      console.log(`[Sync] Processing provider: ${provider.name} (${provider.type})`);
+
       // Get decrypted credentials
       const credentials = provider.getDecryptedCredentials();
+      console.log(`[Sync] Successfully decrypted credentials for provider: ${provider.name}`);
 
       // Create provider service
       const providerServiceInstance = createProviderService(provider.type, credentials);
+      console.log(`[Sync] Created provider service for: ${provider.type}`);
 
       // Get VMs from provider
+      console.log(`[Sync] Fetching VMs from provider: ${provider.name}`);
       const providerVMs = await providerServiceInstance.listVMs();
+      console.log(`[Sync] Found ${providerVMs.length} VMs from provider: ${provider.name}`);
 
       // Process VMs
       for (const vmData of providerVMs) {
-        // Check if VM already exists in our DB
-        const existingVM = await VM.findOne({
-          provider: provider.type,
-          instanceId: vmData.instanceId,
-          providerId: provider._id,
-        });
+        try {
+          console.log(`[Sync] Processing VM: ${vmData.name} (${vmData.instanceId})`);
 
-        if (existingVM) {
-          // Update existing VM
-          existingVM.name = vmData.name;
-          existingVM.state = vmData.state;
-          existingVM.ipAddress = vmData.ipAddress;
-          existingVM.publicIpAddress = vmData.publicIpAddress;
-          existingVM.lastSyncAt = new Date();
-          await existingVM.save();
-          results.push(existingVM);
-        } else {
-          // Create new VM
-          const newVM = await VM.create({
-            ...vmData,
+          // Check if VM already exists in our DB
+          const existingVM = await VM.findOne({
             provider: provider.type,
+            instanceId: vmData.instanceId,
             providerId: provider._id,
           });
-          results.push(newVM);
+
+          if (existingVM) {
+            // Update existing VM
+            console.log(`[Sync] Updating existing VM: ${existingVM.name} (${existingVM._id})`);
+            existingVM.name = vmData.name;
+            existingVM.state = vmData.state;
+            existingVM.ipAddress = vmData.ipAddress;
+            existingVM.publicIpAddress = vmData.publicIpAddress;
+            existingVM.lastSyncAt = new Date();
+            await existingVM.save();
+            results.push(existingVM);
+            console.log(`[Sync] VM updated: ${existingVM.name} (${existingVM._id})`);
+          } else {
+            // Create new VM
+            console.log(`[Sync] Creating new VM: ${vmData.name} (${vmData.instanceId})`);
+            const newVM = await VM.create({
+              ...vmData,
+              provider: provider.type,
+              providerId: provider._id,
+            });
+            results.push(newVM);
+            console.log(`[Sync] New VM created: ${newVM.name} (${newVM._id})`);
+          }
+        } catch (vmError) {
+          console.error(`[Sync] Error processing VM ${vmData.name} (${vmData.instanceId}): ${vmError.message}`);
+          // Continue with next VM
         }
       }
 
       // Update provider sync time
       await providerService.updateProviderSyncTime(provider._id);
+      console.log(`[Sync] Updated sync time for provider: ${provider.name}`);
     } catch (error) {
-      console.error(`Error syncing VMs from provider ${provider.name}: ${error.message}`);
+      console.error(`[Sync] Error syncing VMs from provider ${provider.name}: ${error.message}`, error);
       // Continue with next provider
     }
   }
 
+  console.log(`[Sync] VM sync completed. Total VMs: ${results.length}`);
   return results;
 };
 

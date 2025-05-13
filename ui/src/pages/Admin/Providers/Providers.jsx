@@ -70,10 +70,20 @@ const Providers = () => {
     try {
       await providerService.deleteProvider(providerId);
       setProviders(providers.filter(provider => provider.id !== providerId));
-      toast.success('Provider removed successfully');
+      toast.success('Provider đã được xóa thành công');
     } catch (err) {
       console.error('Error deleting provider:', err);
-      toast.error(err.response?.data?.message || 'Failed to remove provider');
+
+      // Hiển thị thông báo lỗi chi tiết hơn
+      let errorMessage = 'Không thể xóa provider';
+
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage += ': ' + err.message;
+      }
+
+      toast.error(errorMessage);
     }
   };
 

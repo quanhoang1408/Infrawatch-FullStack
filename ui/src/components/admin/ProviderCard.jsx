@@ -7,13 +7,13 @@ const ProviderCard = ({ provider, onDelete }) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
-  
+
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to remove ${provider.name}?`)) {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa provider "${provider.name}"? Nếu có máy ảo đang sử dụng provider này, bạn sẽ cần xóa các máy ảo đó trước.`)) {
       onDelete(provider.id);
     }
   };
-  
+
   return (
     <div className="provider-card">
       <div className="provider-card__header">
@@ -25,7 +25,7 @@ const ProviderCard = ({ provider, onDelete }) => {
           <div className="provider-card__type">{provider.type.toUpperCase()}</div>
         </div>
         <div className="provider-card__actions">
-          <button 
+          <button
             className="provider-card__action provider-card__action--danger"
             onClick={handleDelete}
             title="Delete Provider"
@@ -37,7 +37,7 @@ const ProviderCard = ({ provider, onDelete }) => {
           </button>
         </div>
       </div>
-      
+
       <div className="provider-card__details">
         <div className="provider-card__detail">
           <span className="provider-card__detail-label">Added:</span>
@@ -45,7 +45,7 @@ const ProviderCard = ({ provider, onDelete }) => {
             {provider.createdAt ? formatDate(provider.createdAt) : 'Unknown'}
           </span>
         </div>
-        
+
         {provider.type === 'aws' && provider.region && (
           <div className="provider-card__detail">
             <span className="provider-card__detail-label">Region:</span>

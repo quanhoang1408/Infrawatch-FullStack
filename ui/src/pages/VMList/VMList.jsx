@@ -70,11 +70,35 @@ const VMList = () => {
   const refreshVMs = async () => {
     try {
       setRefreshing(true);
+      toast.info('Đang đồng bộ máy ảo từ các nhà cung cấp...', { autoClose: false, toastId: 'sync-vms' });
+
+      // Gọi API để đồng bộ VM
       await fetchVMs(true); // Pass true to force sync with providers
-      toast.success('VM list refreshed successfully');
+
+      // Cập nhật toast thành công
+      toast.update('sync-vms', {
+        render: 'Đồng bộ máy ảo thành công',
+        type: toast.TYPE.SUCCESS,
+        autoClose: 3000
+      });
     } catch (err) {
       console.error('Error refreshing VMs:', err);
-      toast.error('Failed to refresh VM list');
+
+      // Hiển thị thông báo lỗi chi tiết
+      let errorMessage = 'Không thể đồng bộ danh sách máy ảo';
+
+      if (err.response?.data?.message) {
+        errorMessage += ': ' + err.response.data.message;
+      } else if (err.message) {
+        errorMessage += ': ' + err.message;
+      }
+
+      toast.update('sync-vms', {
+        render: errorMessage,
+        type: toast.TYPE.ERROR,
+        autoClose: 5000
+      });
+
       setRefreshing(false);
     }
   };

@@ -75,6 +75,14 @@ const deleteProvider = async (id) => {
     throw new ApiError(404, 'Provider not found');
   }
 
+  // Kiểm tra xem có VM nào đang sử dụng provider này không
+  const VM = require('../models/vm.model');
+  const vmsUsingProvider = await VM.countDocuments({ providerId: id });
+
+  if (vmsUsingProvider > 0) {
+    throw new ApiError(400, 'Không thể xóa provider vì có máy ảo đang sử dụng. Vui lòng xóa các máy ảo trước.');
+  }
+
   await Provider.deleteOne({ _id: id });
 };
 
