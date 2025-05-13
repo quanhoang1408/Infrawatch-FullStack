@@ -11,7 +11,7 @@ const Login = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
 
-  // Get the redirect path from location state or default to dashboard
+  // Lấy đường dẫn chuyển hướng từ location state hoặc mặc định là dashboard
   const from = location.state?.from?.pathname || '/dashboard';
 
   const handleLogin = async (credentials) => {
@@ -20,17 +20,17 @@ const Login = () => {
     try {
       await login(credentials);
 
-      // Show success toast
+      // Hiển thị thông báo thành công
       toast.success('Đăng nhập thành công! Đang chuyển hướng...');
 
-      // Navigate to the redirect path
+      // Chuyển hướng đến đường dẫn đã định
       setTimeout(() => {
         navigate(from, { replace: true });
       }, 1000);
     } catch (error) {
-      // Show error toast
+      // Hiển thị thông báo lỗi
       toast.error(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.');
-      console.error('Login error:', error);
+      console.error('Lỗi đăng nhập:', error);
     } finally {
       setLoading(false);
     }

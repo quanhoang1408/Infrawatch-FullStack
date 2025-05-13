@@ -47,7 +47,7 @@ const RegisterForm = ({ onSubmit, loading }) => {
       [name]: value
     }));
 
-    // Clear error when user types
+    // Xóa lỗi khi người dùng nhập liệu
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -60,7 +60,7 @@ const RegisterForm = ({ onSubmit, loading }) => {
     e.preventDefault();
 
     if (validateForm()) {
-      // Remove confirmPassword before submission
+      // Loại bỏ confirmPassword trước khi gửi
       const { confirmPassword, ...registerData } = formData;
       onSubmit(registerData);
     }

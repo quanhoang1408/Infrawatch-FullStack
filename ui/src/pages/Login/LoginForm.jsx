@@ -32,7 +32,7 @@ const LoginForm = ({ onSubmit, loading }) => {
       [name]: value
     }));
 
-    // Clear error when user types
+    // Xóa lỗi khi người dùng nhập liệu
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,

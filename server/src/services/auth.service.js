@@ -58,7 +58,7 @@ const verifyRefreshToken = async (refreshToken) => {
   });
 
   if (!tokenDoc) {
-    throw new ApiError(401, 'Invalid refresh token');
+    throw new ApiError(401, 'Token làm mới không hợp lệ');
   }
 
   return tokenDoc;
@@ -72,7 +72,7 @@ const verifyRefreshToken = async (refreshToken) => {
 const register = async (userBody) => {
   // Kiểm tra xem email đã tồn tại chưa
   if (await User.findOne({ email: userBody.email })) {
-    throw new ApiError(409, 'Email already taken');
+    throw new ApiError(409, 'Email đã được sử dụng');
   }
 
   // Tạo user mới
@@ -90,7 +90,7 @@ const login = async (email, password) => {
   // Tìm user
   const user = await User.findOne({ email });
   if (!user || !(await user.isPasswordMatch(password))) {
-    throw new ApiError(401, 'Incorrect email or password');
+    throw new ApiError(401, 'Email hoặc mật khẩu không chính xác');
   }
 
   // Cập nhật thời gian đăng nhập
@@ -114,7 +114,7 @@ const refreshAuth = async (refreshToken) => {
   // Tìm user
   const user = await User.findById(tokenDoc.user);
   if (!user) {
-    throw new ApiError(401, 'User not found');
+    throw new ApiError(401, 'Không tìm thấy người dùng');
   }
 
   // Blacklist token cũ
@@ -138,7 +138,7 @@ const logout = async (refreshToken) => {
   });
 
   if (!tokenDoc) {
-    throw new ApiError(404, 'Token not found');
+    throw new ApiError(404, 'Không tìm thấy token');
   }
 
   await Token.findByIdAndUpdate(tokenDoc._id, { blacklisted: true });

@@ -6,7 +6,7 @@ import Spinner from './Spinner';
 const ProtectedRoute = () => {
   const { user, loading } = useAuth();
 
-  // Show loading spinner while checking authentication
+  // Hiển thị spinner đang tải trong khi kiểm tra xác thực
   if (loading) {
     return (
       <div className="protected-route__loading">
@@ -15,12 +15,12 @@ const ProtectedRoute = () => {
     );
   }
 
-  // Redirect to login if not authenticated
+  // Chuyển hướng đến trang đăng nhập nếu chưa xác thực
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Render child routes if authenticated
+  // Hiển thị các route con nếu đã xác thực
   return <Outlet />;
 };
 

@@ -11,8 +11,8 @@ const authService = {
     const response = await api.post('/auth/register', userData);
     const { user, tokens } = response.data;
 
-    // Save tokens to storage
-    setTokens(tokens.access.token, tokens.refresh.token);
+    // Don't save tokens after registration - user needs to login separately
+    // setTokens(tokens.access.token, tokens.refresh.token);
 
     return { user, tokens };
   },
@@ -32,7 +32,7 @@ const authService = {
 
       return { user, tokens };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Lỗi đăng nhập:', error);
       throw error;
     }
   },
@@ -47,7 +47,7 @@ const authService = {
       try {
         await api.post('/auth/logout', { refreshToken });
       } catch (error) {
-        console.error('Logout error:', error);
+        console.error('Lỗi đăng xuất:', error);
       }
     }
     clearTokens();
@@ -63,8 +63,8 @@ const authService = {
 
       // Check if response is HTML from ngrok
       if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>') && response.data.includes('ngrok')) {
-        console.error('Received HTML from ngrok instead of JSON. This is likely the ngrok warning page.');
-        console.error('Please open the ngrok URL in a browser first and accept the warning:');
+        console.error('Nhận được HTML từ ngrok thay vì JSON. Đây có thể là trang cảnh báo của ngrok.');
+        console.error('Vui lòng mở URL ngrok trong trình duyệt trước và chấp nhận cảnh báo:');
         console.error(api.defaults.baseURL);
 
         // Show a more helpful error message
@@ -75,7 +75,7 @@ const authService = {
 
       return response.data;
     } catch (error) {
-      console.error('Get current user error:', error);
+      console.error('Lỗi lấy thông tin người dùng hiện tại:', error);
       throw error;
     }
   },

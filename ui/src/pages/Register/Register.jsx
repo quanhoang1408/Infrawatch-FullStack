@@ -17,16 +17,16 @@ const Register = () => {
       await register(userData);
 
       // Show success toast
-      toast.success('Đăng ký thành công! Đang chuyển hướng đến trang chủ...');
+      toast.success('Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập...');
 
-      // Navigate to dashboard
+      // Navigate to login page
       setTimeout(() => {
-        navigate('/dashboard', { replace: true });
+        navigate('/login', { replace: true });
       }, 1000);
     } catch (error) {
       // Show error toast
       toast.error(error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
-      console.error('Registration error:', error);
+      console.error('Lỗi đăng ký:', error);
     } finally {
       setLoading(false);
     }

@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
           const userData = await authService.getCurrentUser();
           setUser(userData);
         } catch (err) {
-          console.error('Failed to fetch user data:', err);
+          console.error('Không thể lấy dữ liệu người dùng:', err);
           clearTokens();
         }
       }
@@ -36,12 +36,12 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const result = await authService.register(userData);
-      setUser(result.user);
+      // Don't set user after registration - user needs to login separately
       setLoading(false);
       return result;
     } catch (err) {
       setLoading(false);
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.response?.data?.message || 'Đăng ký thất bại');
       throw err;
     }
   };
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
       return result;
     } catch (err) {
       setLoading(false);
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || 'Đăng nhập thất bại');
       throw err;
     }
   };
@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       navigate('/login');
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('Lỗi đăng xuất:', err);
     } finally {
       setLoading(false);
     }
