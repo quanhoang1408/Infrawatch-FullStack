@@ -1,5 +1,6 @@
 // src/services/provider/provider.factory.js
 const AWSService = require('./aws.service');
+const GCPService = require('./gcp.service');
 const { ApiError } = require('../../utils/errors');
 
 /**
@@ -16,8 +17,7 @@ const createProviderService = (type, credentials) => {
       // TODO: Implement Azure service
       throw new ApiError(501, 'Azure provider not implemented yet');
     case 'gcp':
-      // TODO: Implement GCP service
-      throw new ApiError(501, 'GCP provider not implemented yet');
+      return new GCPService(credentials);
     case 'vmware':
       // TODO: Implement VMware service
       throw new ApiError(501, 'VMware provider not implemented yet');

@@ -12,5 +12,7 @@ router.post('/login', validate(authValidation.login), authController.login);
 router.post('/refresh-tokens', validate(authValidation.refreshToken), authController.refreshTokens);
 router.post('/logout', validate(authValidation.logout), authController.logout);
 router.get('/me', auth(), authController.getMe);
+router.post('/forgot-password', validate(authValidation.forgotPassword), authController.forgotPassword);
+router.post('/reset-password', validate(authValidation.resetPassword), authController.resetPassword);
 
 module.exports = router;

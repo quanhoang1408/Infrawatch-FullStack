@@ -144,6 +144,72 @@ const logout = async (refreshToken) => {
   await Token.findByIdAndUpdate(tokenDoc._id, { blacklisted: true });
 };
 
+/**
+ * Gửi email quên mật khẩu
+ * @param {string} email
+ * @returns {Promise<Token>}
+ */
+const forgotPassword = async (email) => {
+  // Tìm user
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new ApiError(404, 'Không tìm thấy người dùng với email này');
+  }
+
+  // Tạo token đặt lại mật khẩu
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const resetTokenExpires = moment().add(1, 'hours');
+
+  // Lưu token vào database
+  const tokenDoc = await Token.create({
+    token: resetToken,
+    user: user.id,
+    type: 'resetPassword',
+    expires: resetTokenExpires.toDate(),
+  });
+
+  // TODO: Gửi email với link đặt lại mật khẩu
+  // Trong môi trường thực tế, bạn sẽ gửi email với link chứa token
+  // Ví dụ: https://your-app.com/reset-password?token=resetToken
+
+  return tokenDoc;
+};
+
+/**
+ * Đặt lại mật khẩu
+ * @param {string} resetToken
+ * @param {string} newPassword
+ * @returns {Promise<User>}
+ */
+const resetPassword = async (resetToken, newPassword) => {
+  // Tìm token hợp lệ
+  const tokenDoc = await Token.findOne({
+    token: resetToken,
+    type: 'resetPassword',
+    blacklisted: false,
+    expires: { $gt: new Date() },
+  });
+
+  if (!tokenDoc) {
+    throw new ApiError(401, 'Token không hợp lệ hoặc đã hết hạn');
+  }
+
+  // Tìm user
+  const user = await User.findById(tokenDoc.user);
+  if (!user) {
+    throw new ApiError(404, 'Không tìm thấy người dùng');
+  }
+
+  // Cập nhật mật khẩu
+  user.password = newPassword;
+  await user.save();
+
+  // Blacklist token
+  await Token.findByIdAndUpdate(tokenDoc._id, { blacklisted: true });
+
+  return user;
+};
+
 module.exports = {
   register,
   login,
@@ -151,4 +217,6 @@ module.exports = {
   logout,
   generateTokens,
   verifyRefreshToken,
+  forgotPassword,
+  resetPassword,
 };

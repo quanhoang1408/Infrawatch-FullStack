@@ -44,10 +44,37 @@ const getMe = asyncHandler(async (req, res) => {
   res.send(req.user);
 });
 
+/**
+ * Quên mật khẩu
+ */
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const token = await authService.forgotPassword(email);
+
+  // Trong môi trường thực tế, chúng ta sẽ không trả về token
+  // Thay vào đó, chúng ta sẽ gửi email với link đặt lại mật khẩu
+  // Ở đây, chúng ta trả về token để dễ dàng kiểm thử
+  res.status(200).send({
+    message: 'Hướng dẫn đặt lại mật khẩu đã được gửi đến email của bạn',
+    token: token.token // Chỉ trả về trong môi trường phát triển
+  });
+});
+
+/**
+ * Đặt lại mật khẩu
+ */
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  await authService.resetPassword(token, password);
+  res.status(200).send({ message: 'Mật khẩu đã được đặt lại thành công' });
+});
+
 module.exports = {
   register,
   login,
   refreshTokens,
   logout,
   getMe,
+  forgotPassword,
+  resetPassword,
 };

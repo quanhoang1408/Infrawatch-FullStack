@@ -7,12 +7,24 @@ const createProvider = {
     name: Joi.string().required(),
     type: Joi.string().valid('aws', 'azure', 'gcp', 'vmware').required(),
     credentials: Joi.object().required().when('type', {
-      is: 'aws',
-      then: Joi.object().keys({
-        accessKeyId: Joi.string().required(),
-        secretAccessKey: Joi.string().required(),
-        region: Joi.string().required(),
-      }),
+      switch: [
+        {
+          is: 'aws',
+          then: Joi.object().keys({
+            accessKeyId: Joi.string().required(),
+            secretAccessKey: Joi.string().required(),
+            region: Joi.string().required(),
+          })
+        },
+        {
+          is: 'gcp',
+          then: Joi.object().keys({
+            projectId: Joi.string().required(),
+            keyFile: Joi.string().required(),
+            zone: Joi.string()
+          })
+        }
+      ],
       otherwise: Joi.object(),
     }),
     status: Joi.string().valid('active', 'inactive'),

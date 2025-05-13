@@ -1,0 +1,11 @@
+.user-form {
+  max-width: 600px;
+  margin: 0 auto;
+  
+  &__title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+}

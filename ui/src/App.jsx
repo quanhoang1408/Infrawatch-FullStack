@@ -12,11 +12,15 @@ import { MainLayout } from './components/layout';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import VMList from './pages/VMList';
 import VMDetail from './pages/VMDetail/VMDetail';
 import Terminal from './pages/Terminal';
 import Providers from './pages/Admin/Providers';
+import Users from './pages/Admin/Users';
+import VMAssignments from './pages/Admin/VMAssignments';
 import NotFound from './pages/NotFound';
 
 // Styles
@@ -33,6 +37,8 @@ const App = () => {
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               {/* Protected routes */}
               <Route element={<ProtectedRoute />}>
@@ -45,7 +51,8 @@ const App = () => {
                   {/* Admin routes */}
                   <Route element={<AdminRoute />}>
                     <Route path="/admin/providers" element={<Providers />} />
-                    {/* Add more admin routes here in the future */}
+                    <Route path="/admin/users" element={<Users />} />
+                    <Route path="/admin/vm-assignments" element={<VMAssignments />} />
                   </Route>
 
                   {/* Add more protected routes here in the future */}
