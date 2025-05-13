@@ -210,6 +210,38 @@ const resetPassword = async (resetToken, newPassword) => {
   return user;
 };
 
+/**
+ * Thay đổi mật khẩu của người dùng đã đăng nhập
+ * @param {string} userId - ID của người dùng
+ * @param {string} currentPassword - Mật khẩu hiện tại
+ * @param {string} newPassword - Mật khẩu mới
+ * @returns {Promise<User>} - Thông tin người dùng đã cập nhật
+ */
+const changePassword = async (userId, currentPassword, newPassword) => {
+  // Tìm user
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, 'Không tìm thấy người dùng');
+  }
+
+  // Kiểm tra mật khẩu hiện tại
+  const isPasswordMatch = await user.isPasswordMatch(currentPassword);
+  if (!isPasswordMatch) {
+    throw new ApiError(401, 'Mật khẩu hiện tại không chính xác');
+  }
+
+  // Kiểm tra mật khẩu mới không trùng với mật khẩu cũ
+  if (await user.isPasswordMatch(newPassword)) {
+    throw new ApiError(400, 'Mật khẩu mới không được trùng với mật khẩu cũ');
+  }
+
+  // Cập nhật mật khẩu
+  user.password = newPassword;
+  await user.save();
+
+  return user;
+};
+
 module.exports = {
   register,
   login,
@@ -219,4 +251,5 @@ module.exports = {
   verifyRefreshToken,
   forgotPassword,
   resetPassword,
+  changePassword,
 };

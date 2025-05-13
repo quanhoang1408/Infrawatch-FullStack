@@ -69,6 +69,15 @@ const resetPassword = asyncHandler(async (req, res) => {
   res.status(200).send({ message: 'Mật khẩu đã được đặt lại thành công' });
 });
 
+/**
+ * Thay đổi mật khẩu của người dùng đã đăng nhập
+ */
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  await authService.changePassword(req.user.id, currentPassword, newPassword);
+  res.status(200).send({ message: 'Mật khẩu đã được thay đổi thành công' });
+});
+
 module.exports = {
   register,
   login,
@@ -77,4 +86,5 @@ module.exports = {
   getMe,
   forgotPassword,
   resetPassword,
+  changePassword,
 };
