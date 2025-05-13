@@ -62,9 +62,16 @@ if (process.env.NODE_ENV === 'development') {
 // Request interceptor for adding auth token
 api.interceptors.request.use(
   (config) => {
-    // In development, log requests
+    // In development, log requests with more details
     if (process.env.NODE_ENV === 'development') {
-      console.log(`${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+      console.log(`API Request: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
+      console.log('Request Config:', {
+        url: config.url,
+        method: config.method,
+        baseURL: config.baseURL,
+        headers: config.headers,
+        data: config.data
+      });
     }
 
     const token = getAccessToken();
@@ -73,12 +80,27 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor for handling token refresh and network errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Log successful responses in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Response Success:', {
+        url: response.config.url,
+        method: response.config.method,
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
+    }
+    return response;
+  },
   async (error) => {
     // Enhanced error logging
     console.error('API Error:', {
@@ -87,7 +109,8 @@ api.interceptors.response.use(
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
-      message: error.message
+      message: error.message,
+      stack: error.stack
     });
 
     const originalRequest = error.config;

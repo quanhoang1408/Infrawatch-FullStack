@@ -17,6 +17,11 @@ router
     auth(),
     validate(userValidation.updateProfile),
     userController.updateProfile
+  )
+  .put(
+    auth(),
+    validate(userValidation.updateProfile),
+    userController.updateProfile
   );
 
 module.exports = router;

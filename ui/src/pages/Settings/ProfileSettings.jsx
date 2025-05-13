@@ -42,8 +42,11 @@ const ProfileSettings = () => {
 
   // Update profile handler
   const handleUpdateProfile = async (values) => {
+    // Prevent default form submission behavior
+    console.log('Handling profile update with values:', values);
+
     // Chỉ cập nhật nếu tên đã thay đổi
-    if (values.name === user.name) {
+    if (values.name === user?.name) {
       message.info('Tên của bạn không thay đổi');
       return;
     }
@@ -51,8 +54,12 @@ const ProfileSettings = () => {
     setLoading(true);
 
     try {
-      // Gọi API để cập nhật tên người dùng
-      const response = await api.patch('/users/profile', { name: values.name });
+      console.log('Sending PUT request to /users/profile with data:', { name: values.name });
+
+      // Gọi API để cập nhật tên người dùng - sử dụng PUT thay vì PATCH vì server CORS không chấp nhận PATCH
+      const response = await api.put('/users/profile', { name: values.name });
+
+      console.log('Profile update response:', response.data);
 
       // Cập nhật thông tin người dùng trong context
       updateUserInContext(response.data);
@@ -61,12 +68,14 @@ const ProfileSettings = () => {
     } catch (err) {
       console.error('Error updating profile:', err);
 
-      // Hiển thị thông báo lỗi
+      // Hiển thị thông báo lỗi chi tiết hơn
       let errorMessage = 'Không thể cập nhật thông tin cá nhân';
 
       if (err.response) {
+        console.error('Error response:', err.response);
         errorMessage += ': ' + (err.response.data?.message || err.response.statusText);
       } else if (err.request) {
+        console.error('Error request:', err.request);
         errorMessage += ': Lỗi kết nối đến server. Vui lòng kiểm tra kết nối mạng của bạn.';
       } else {
         errorMessage += ': ' + err.message;
@@ -166,6 +175,11 @@ const ProfileSettings = () => {
             phone: user?.phone || ''
           }}
           onFinish={handleUpdateProfile}
+          onSubmit={(e) => {
+            e.preventDefault();
+            console.log('Form submit event prevented');
+            profileForm.submit();
+          }}
         >
           <Form.Item
             name="name"
@@ -192,6 +206,10 @@ const ProfileSettings = () => {
               type="primary"
               htmlType="submit"
               loading={loading}
+              onClick={(e) => {
+                console.log('Update button clicked');
+                // Let the form's onFinish handle the submission
+              }}
             >
               Cập nhật thông tin
             </Button>

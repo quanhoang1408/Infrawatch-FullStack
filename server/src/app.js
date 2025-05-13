@@ -27,7 +27,7 @@ app.use(compression());
 app.use(cors({
   // Allow any origin to connect to the API
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token', 'Sec-WebSocket-Protocol'],
   credentials: false, // Must be false when using origin: '*'
   preflightContinue: false,
@@ -55,7 +55,7 @@ const credentialsCors = cors({
       callback(new Error('Not allowed by CORS'));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Agent-Token', 'Sec-WebSocket-Protocol'],
   credentials: true,
   preflightContinue: false,
