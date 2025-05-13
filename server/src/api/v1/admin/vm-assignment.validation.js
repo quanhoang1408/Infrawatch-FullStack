@@ -10,8 +10,9 @@ const assignVM = {
 };
 
 const unassignVM = {
-  params: Joi.object().keys({
-    assignmentId: Joi.string().custom(objectId).required(),
+  body: Joi.object().keys({
+    vmId: Joi.string().custom(objectId).required(),
+    userId: Joi.string().custom(objectId).required(),
   }),
 };
 
