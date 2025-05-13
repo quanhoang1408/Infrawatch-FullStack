@@ -7,7 +7,7 @@ const { Option } = Select;
 
 const UserForm = ({ user, onSubmit, onCancel, loading, isEditing = false }) => {
   const [form] = Form.useForm();
-  
+
   // Initialize form with user data if editing
   React.useEffect(() => {
     if (isEditing && user) {
@@ -29,7 +29,7 @@ const UserForm = ({ user, onSubmit, onCancel, loading, isEditing = false }) => {
       <h2 className="user-form__title">
         {isEditing ? 'Chỉnh sửa người dùng' : 'Thêm người dùng mới'}
       </h2>
-      
+
       <Form
         form={form}
         layout="vertical"
@@ -44,13 +44,13 @@ const UserForm = ({ user, onSubmit, onCancel, loading, isEditing = false }) => {
           label="Họ và tên"
           rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
         >
-          <Input 
-            prefix={<UserOutlined />} 
-            placeholder="Họ và tên" 
+          <Input
+            prefix={<UserOutlined />}
+            placeholder="Họ và tên"
             disabled={loading}
           />
         </Form.Item>
-        
+
         <Form.Item
           name="email"
           label="Email"
@@ -59,13 +59,13 @@ const UserForm = ({ user, onSubmit, onCancel, loading, isEditing = false }) => {
             { type: 'email', message: 'Email không hợp lệ' }
           ]}
         >
-          <Input 
-            prefix={<MailOutlined />} 
-            placeholder="Email" 
-            disabled={loading || (isEditing && user?.email)}
+          <Input
+            prefix={<MailOutlined />}
+            placeholder="Email"
+            disabled={loading}
           />
         </Form.Item>
-        
+
         {!isEditing && (
           <Form.Item
             name="password"
@@ -75,14 +75,14 @@ const UserForm = ({ user, onSubmit, onCancel, loading, isEditing = false }) => {
               { min: 8, message: 'Mật khẩu phải có ít nhất 8 ký tự' }
             ]}
           >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="Mật khẩu" 
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Mật khẩu"
               disabled={loading}
             />
           </Form.Item>
         )}
-        
+
         <Form.Item
           name="role"
           label="Vai trò"
@@ -93,7 +93,7 @@ const UserForm = ({ user, onSubmit, onCancel, loading, isEditing = false }) => {
             <Option value="admin">Quản trị viên</Option>
           </Select>
         </Form.Item>
-        
+
         <Form.Item
           name="status"
           label="Trạng thái"
@@ -105,7 +105,7 @@ const UserForm = ({ user, onSubmit, onCancel, loading, isEditing = false }) => {
             <Option value="suspended">Đã khóa</Option>
           </Select>
         </Form.Item>
-        
+
         <Form.Item>
           <Space>
             <Button type="primary" htmlType="submit" loading={loading}>

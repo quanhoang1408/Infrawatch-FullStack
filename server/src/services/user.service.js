@@ -47,22 +47,40 @@ const getUserById = async (id) => {
  * @returns {Promise<User>} Updated user
  */
 const updateUserById = async (id, updateBody) => {
-  const user = await getUserById(id);
+  try {
+    const user = await getUserById(id);
 
-  // If updating email, check if it's already taken
-  if (updateBody.email && (await User.findOne({ email: updateBody.email, _id: { $ne: id } }))) {
-    throw new ApiError(409, 'Email đã được sử dụng bởi người dùng khác');
+    // Kiểm tra xem có trường nào được cập nhật không
+    if (Object.keys(updateBody).length === 0) {
+      throw new ApiError(400, 'Không có thông tin nào được cập nhật');
+    }
+
+    // If updating email, check if it's already taken
+    if (updateBody.email && (await User.findOne({ email: updateBody.email, _id: { $ne: id } }))) {
+      throw new ApiError(409, 'Email đã được sử dụng bởi người dùng khác');
+    }
+
+    // If updating password, hash it
+    if (updateBody.password) {
+      updateBody.password = await bcrypt.hash(updateBody.password, 10);
+    }
+
+    // Cập nhật từng trường một cách rõ ràng
+    if (updateBody.name) user.name = updateBody.name;
+    if (updateBody.email) user.email = updateBody.email;
+    if (updateBody.password) user.password = updateBody.password;
+    if (updateBody.role) user.role = updateBody.role;
+    if (updateBody.status) user.status = updateBody.status;
+
+    await user.save();
+    return user;
+  } catch (error) {
+    // Ghi log lỗi để dễ dàng debug
+    console.error('Error updating user:', error);
+
+    // Ném lại lỗi để controller xử lý
+    throw error;
   }
-
-  // If updating password, hash it
-  if (updateBody.password) {
-    updateBody.password = await bcrypt.hash(updateBody.password, 10);
-  }
-
-  // Update user
-  Object.assign(user, updateBody);
-  await user.save();
-  return user;
 };
 
 /**

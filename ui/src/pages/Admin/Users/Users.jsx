@@ -28,7 +28,7 @@ const Users = () => {
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await api.get('/admin/users');
       setUsers(response.data);
@@ -43,7 +43,7 @@ const Users = () => {
   // Handle adding a new user
   const handleAddUser = async (userData) => {
     setAddingInProgress(true);
-    
+
     try {
       const response = await api.post('/admin/users', userData);
       setUsers([...users, response.data]);
@@ -60,21 +60,38 @@ const Users = () => {
   // Handle editing a user
   const handleEditUser = async (userData) => {
     setEditingInProgress(true);
-    
+
     try {
-      const response = await api.patch(`/admin/users/${currentUser._id}`, userData);
-      
+      // Chỉ gửi các trường đã được thay đổi
+      const updatedFields = {};
+
+      // Kiểm tra từng trường và chỉ thêm vào nếu có giá trị
+      if (userData.name) updatedFields.name = userData.name;
+      if (userData.email) updatedFields.email = userData.email;
+      if (userData.role) updatedFields.role = userData.role;
+      if (userData.status) updatedFields.status = userData.status;
+      if (userData.password) updatedFields.password = userData.password;
+
+      // Đảm bảo có ít nhất một trường được cập nhật
+      if (Object.keys(updatedFields).length === 0) {
+        throw new Error('Không có thông tin nào được thay đổi');
+      }
+
+      console.log('Updating user with data:', updatedFields);
+
+      const response = await api.patch(`/admin/users/${currentUser._id}`, updatedFields);
+
       // Update users list
-      setUsers(users.map(user => 
+      setUsers(users.map(user =>
         user._id === currentUser._id ? response.data : user
       ));
-      
+
       setIsEditingUser(false);
       setCurrentUser(null);
       message.success('Người dùng đã được cập nhật thành công');
     } catch (err) {
       console.error('Error updating user:', err);
-      message.error(err.response?.data?.message || 'Không thể cập nhật người dùng');
+      message.error(err.response?.data?.message || 'Không thể cập nhật người dùng: ' + (err.response?.data?.message || err.message));
     } finally {
       setEditingInProgress(false);
     }
@@ -83,14 +100,16 @@ const Users = () => {
   // Handle deleting a user
   const handleDeleteUser = async (userId) => {
     try {
+      console.log('Deleting user with ID:', userId);
       await api.delete(`/admin/users/${userId}`);
-      
+
       // Update users list
       setUsers(users.filter(user => user._id !== userId));
       message.success('Người dùng đã được xóa thành công');
     } catch (err) {
       console.error('Error deleting user:', err);
-      message.error(err.response?.data?.message || 'Không thể xóa người dùng');
+      // Hiển thị thông báo lỗi chi tiết hơn
+      message.error(err.response?.data?.message || 'Không thể xóa người dùng: ' + (err.message || ''));
     }
   };
 
@@ -134,7 +153,7 @@ const Users = () => {
       key: 'status',
       render: (status) => (
         <span className={`status-badge status-${status}`}>
-          {status === 'active' ? 'Hoạt động' : 
+          {status === 'active' ? 'Hoạt động' :
            status === 'inactive' ? 'Không hoạt động' : 'Đã khóa'}
         </span>
       ),
@@ -147,9 +166,9 @@ const Users = () => {
           <Button type="primary" onClick={() => editUser(record)}>
             Sửa
           </Button>
-          <Button 
-            type="primary" 
-            danger 
+          <Button
+            type="primary"
+            danger
             onClick={() => {
               Modal.confirm({
                 title: 'Xác nhận xóa người dùng',
@@ -204,9 +223,9 @@ const Users = () => {
     }
 
     return (
-      <Table 
-        columns={columns} 
-        dataSource={users} 
+      <Table
+        columns={columns}
+        dataSource={users}
         rowKey="_id"
         pagination={{ pageSize: 10 }}
       />
