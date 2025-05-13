@@ -1,37 +1,32 @@
 import React, { useState } from 'react';
-import { 
-  Card, 
-  Button, 
-  Typography, 
-  Tag, 
-  Space, 
-  Modal, 
+import {
+  Card,
+  Button,
+  Typography,
+  Tag,
+  Space,
+  Modal,
   Form,
-  Input, 
-  Select, 
+  Input,
+  Select,
   Tooltip,
   Empty,
   Badge,
   Divider
 } from 'antd';
-import { 
-  PlusOutlined, 
-  KeyOutlined, 
+import {
+  PlusOutlined,
+  KeyOutlined,
   InfoCircleOutlined,
-  DownloadOutlined, 
-  DeleteOutlined, 
+  DownloadOutlined,
+  DeleteOutlined,
   ClockCircleOutlined,
-  UserOutlined, 
-  CloudServerOutlined 
+  UserOutlined,
+  CloudServerOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { 
-  getCertificates, 
-  createCertificate, 
-  revokeCertificate, 
-  deleteCertificate 
-} from '../../services/certificate.service';
-import { getVMs } from '../../services/vm.service';
+import certificateService from '../../services/certificate.service';
+import vmService from '../../services/vm.service';
 import { formatDateIntelligently, formatDate } from '../../utils/date.utils';
 import { getStatusColor } from '../../utils/format.utils';
 
@@ -47,59 +42,59 @@ const SSHSettings = () => {
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
-  
+
   // Fetch certificates
-  const { 
-    data: certificates = [], 
+  const {
+    data: certificates = [],
     isLoading: certificatesLoading,
     error: certificatesError
-  } = useQuery('certificates', getCertificates);
-  
+  } = useQuery('certificates', certificateService.getCertificates);
+
   // Fetch VMs for certificate creation
-  const { 
-    data: vms = [], 
+  const {
+    data: vms = [],
     isLoading: vmsLoading
-  } = useQuery('vms', () => getVMs(), {
+  } = useQuery('vms', () => vmService.getVMs(), {
     enabled: createModalVisible // Only fetch when modal is open
   });
-  
+
   // Create certificate mutation
-  const createMutation = useMutation(createCertificate, {
+  const createMutation = useMutation(certificateService.createCertificate, {
     onSuccess: () => {
       queryClient.invalidateQueries('certificates');
       setCreateModalVisible(false);
       form.resetFields();
     }
   });
-  
+
   // Delete certificate mutation
-  const deleteMutation = useMutation(deleteCertificate, {
+  const deleteMutation = useMutation(certificateService.deleteCertificate, {
     onSuccess: () => {
       queryClient.invalidateQueries('certificates');
       setDeleteModalVisible(false);
       setSelectedCertificate(null);
     }
   });
-  
+
   // Revoke certificate mutation
-  const revokeMutation = useMutation(revokeCertificate, {
+  const revokeMutation = useMutation(certificateService.revokeCertificate, {
     onSuccess: () => {
       queryClient.invalidateQueries('certificates');
     }
   });
-  
+
   // Create certificate handler
   const handleCreateCertificate = (values) => {
     createMutation.mutate(values);
   };
-  
+
   // Delete certificate handler
   const handleDeleteCertificate = () => {
     if (selectedCertificate) {
       deleteMutation.mutate(selectedCertificate.id);
     }
   };
-  
+
   // Revoke certificate handler
   const handleRevokeCertificate = (certificate) => {
     Modal.confirm({
@@ -113,13 +108,13 @@ const SSHSettings = () => {
       }
     });
   };
-  
+
   // Show delete modal
   const showDeleteModal = (certificate) => {
     setSelectedCertificate(certificate);
     setDeleteModalVisible(true);
   };
-  
+
   // Show certificate VM details handler
   const showCertificateDetails = (certificate) => {
     Modal.info({
@@ -157,20 +152,20 @@ const SSHSettings = () => {
     <div className="ssh-settings">
       <div className="settings-header">
         <Title level={2}>SSH Certificate Management</Title>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
           onClick={() => setCreateModalVisible(true)}
         >
           Tạo Certificate
         </Button>
       </div>
-      
+
       <Paragraph>
-        SSH Certificates cho phép bạn truy cập các máy ảo một cách an toàn mà không cần quản lý nhiều khóa SSH. 
+        SSH Certificates cho phép bạn truy cập các máy ảo một cách an toàn mà không cần quản lý nhiều khóa SSH.
         Hệ thống sẽ tạo và quản lý certificates tập trung qua HashiCorp Vault.
       </Paragraph>
-      
+
       <div className="certificate-list">
         {certificatesLoading ? (
           <div className="loading-container">Đang tải certificates...</div>
@@ -179,20 +174,20 @@ const SSHSettings = () => {
             <Text type="danger">Lỗi khi tải certificates. Vui lòng thử lại sau.</Text>
           </div>
         ) : certificates.length === 0 ? (
-          <Empty 
-            description="Không có certificate nào" 
+          <Empty
+            description="Không có certificate nào"
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
         ) : (
           certificates.map(certificate => (
-            <Card 
+            <Card
               key={certificate.id}
               title={
                 <Space>
                   <KeyOutlined />
                   {certificate.name}
-                  <Badge 
-                    status={certificate.status === 'active' ? 'success' : 'error'} 
+                  <Badge
+                    status={certificate.status === 'active' ? 'success' : 'error'}
                     text={certificate.status === 'active' ? 'Hoạt động' : 'Hết hạn'}
                   />
                 </Space>
@@ -201,16 +196,16 @@ const SSHSettings = () => {
               extra={
                 <Space>
                   <Tooltip title="Xem chi tiết">
-                    <Button 
-                      icon={<InfoCircleOutlined />} 
-                      size="small" 
+                    <Button
+                      icon={<InfoCircleOutlined />}
+                      size="small"
                       onClick={() => showCertificateDetails(certificate)}
                     />
                   </Tooltip>
                   {certificate.status === 'active' && (
                     <Tooltip title="Thu hồi">
-                      <Button 
-                        icon={<DownloadOutlined />} 
+                      <Button
+                        icon={<DownloadOutlined />}
                         size="small"
                         danger
                         onClick={() => handleRevokeCertificate(certificate)}
@@ -218,8 +213,8 @@ const SSHSettings = () => {
                     </Tooltip>
                   )}
                   <Tooltip title="Xóa">
-                    <Button 
-                      icon={<DeleteOutlined />} 
+                    <Button
+                      icon={<DeleteOutlined />}
                       size="small"
                       danger
                       onClick={() => showDeleteModal(certificate)}
@@ -235,7 +230,7 @@ const SSHSettings = () => {
                     <span>Người tạo: {certificate.user}</span>
                   </Space>
                 </p>
-                
+
                 <div className="certificate-date">
                   <Text type="secondary">
                     <ClockCircleOutlined /> Tạo: {formatDateIntelligently(certificate.created)}
@@ -245,7 +240,7 @@ const SSHSettings = () => {
                   </Text>
                 </div>
               </div>
-              
+
               <div className="certificate-vms">
                 <Space>
                   <CloudServerOutlined />
@@ -270,7 +265,7 @@ const SSHSettings = () => {
           ))
         )}
       </div>
-      
+
       {/* Create Certificate Modal */}
       <Modal
         title="Tạo Certificate mới"
@@ -295,7 +290,7 @@ const SSHSettings = () => {
           >
             <Input placeholder="Ví dụ: Production Access" />
           </Form.Item>
-          
+
           <Form.Item
             name="vms"
             label="Máy ảo"
@@ -315,7 +310,7 @@ const SSHSettings = () => {
               ))}
             </Select>
           </Form.Item>
-          
+
           <Form.Item
             name="validityDays"
             label="Thời hạn"
@@ -329,10 +324,10 @@ const SSHSettings = () => {
               <Option value={730}>2 năm</Option>
             </Select>
           </Form.Item>
-          
+
           <Form.Item>
             <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
+              <Button
                 onClick={() => {
                   setCreateModalVisible(false);
                   form.resetFields();
@@ -340,9 +335,9 @@ const SSHSettings = () => {
               >
                 Hủy
               </Button>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
+              <Button
+                type="primary"
+                htmlType="submit"
                 loading={createMutation.isLoading}
               >
                 Tạo Certificate
@@ -351,7 +346,7 @@ const SSHSettings = () => {
           </Form.Item>
         </Form>
       </Modal>
-      
+
       {/* Delete Certificate Modal */}
       <Modal
         title="Xác nhận xóa certificate"

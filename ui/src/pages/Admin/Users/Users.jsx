@@ -14,10 +14,7 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAddingUser, setIsAddingUser] = useState(false);
-  const [isEditingUser, setIsEditingUser] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const [addingInProgress, setAddingInProgress] = useState(false);
-  const [editingInProgress, setEditingInProgress] = useState(false);
 
   // Fetch users on component mount
   useEffect(() => {
@@ -57,67 +54,52 @@ const Users = () => {
     }
   };
 
-  // Handle editing a user
-  const handleEditUser = async (userData) => {
-    setEditingInProgress(true);
-
-    try {
-      // Chỉ gửi các trường đã được thay đổi
-      const updatedFields = {};
-
-      // Kiểm tra từng trường và chỉ thêm vào nếu có giá trị
-      if (userData.name) updatedFields.name = userData.name;
-      if (userData.email) updatedFields.email = userData.email;
-      if (userData.role) updatedFields.role = userData.role;
-      if (userData.status) updatedFields.status = userData.status;
-      if (userData.password) updatedFields.password = userData.password;
-
-      // Đảm bảo có ít nhất một trường được cập nhật
-      if (Object.keys(updatedFields).length === 0) {
-        throw new Error('Không có thông tin nào được thay đổi');
-      }
-
-      console.log('Updating user with data:', updatedFields);
-
-      const response = await api.patch(`/admin/users/${currentUser._id}`, updatedFields);
-
-      // Update users list
-      setUsers(users.map(user =>
-        user._id === currentUser._id ? response.data : user
-      ));
-
-      setIsEditingUser(false);
-      setCurrentUser(null);
-      message.success('Người dùng đã được cập nhật thành công');
-    } catch (err) {
-      console.error('Error updating user:', err);
-      message.error(err.response?.data?.message || 'Không thể cập nhật người dùng: ' + (err.response?.data?.message || err.message));
-    } finally {
-      setEditingInProgress(false);
-    }
-  };
+  // Đã xóa phương thức handleEditUser
 
   // Handle deleting a user
   const handleDeleteUser = async (userId) => {
     try {
       console.log('Deleting user with ID:', userId);
-      await api.delete(`/admin/users/${userId}`);
+
+      // Sử dụng fetch thay vì axios để loại trừ vấn đề với thư viện axios
+      const response = await fetch(`${api.defaults.baseURL}/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       // Update users list
       setUsers(users.filter(user => user._id !== userId));
       message.success('Người dùng đã được xóa thành công');
     } catch (err) {
       console.error('Error deleting user:', err);
+
       // Hiển thị thông báo lỗi chi tiết hơn
-      message.error(err.response?.data?.message || 'Không thể xóa người dùng: ' + (err.message || ''));
+      let errorMessage = 'Không thể xóa người dùng';
+
+      if (err.response) {
+        // Lỗi từ server
+        errorMessage += ': ' + (err.response.data?.message || err.response.statusText);
+        console.error('Server error details:', err.response.data);
+      } else if (err.request) {
+        // Lỗi network - không nhận được phản hồi từ server
+        errorMessage += ': Lỗi kết nối đến server. Vui lòng kiểm tra kết nối mạng của bạn.';
+        console.error('Network error details:', err.request);
+      } else {
+        // Lỗi khác
+        errorMessage += ': ' + err.message;
+      }
+
+      message.error(errorMessage);
     }
   };
 
-  // Edit user
-  const editUser = (user) => {
-    setCurrentUser(user);
-    setIsEditingUser(true);
-  };
+  // Đã xóa phương thức editUser
 
   // Table columns
   const columns = [
@@ -162,27 +144,22 @@ const Users = () => {
       title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
-        <Space size="middle">
-          <Button type="primary" onClick={() => editUser(record)}>
-            Sửa
-          </Button>
-          <Button
-            type="primary"
-            danger
-            onClick={() => {
-              Modal.confirm({
-                title: 'Xác nhận xóa người dùng',
-                content: `Bạn có chắc chắn muốn xóa người dùng ${record.name}?`,
-                okText: 'Xóa',
-                okType: 'danger',
-                cancelText: 'Hủy',
-                onOk: () => handleDeleteUser(record._id),
-              });
-            }}
-          >
-            Xóa
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          danger
+          onClick={() => {
+            Modal.confirm({
+              title: 'Xác nhận xóa người dùng',
+              content: `Bạn có chắc chắn muốn xóa người dùng ${record.name}?`,
+              okText: 'Xóa',
+              okType: 'danger',
+              cancelText: 'Hủy',
+              onOk: () => handleDeleteUser(record._id),
+            });
+          }}
+        >
+          Xóa
+        </Button>
       ),
     },
   ];
@@ -254,17 +231,6 @@ const Users = () => {
             onSubmit={handleAddUser}
             onCancel={() => setIsAddingUser(false)}
             loading={addingInProgress}
-          />
-        ) : isEditingUser ? (
-          <UserForm
-            user={currentUser}
-            onSubmit={handleEditUser}
-            onCancel={() => {
-              setIsEditingUser(false);
-              setCurrentUser(null);
-            }}
-            loading={editingInProgress}
-            isEditing
           />
         ) : (
           renderContent()

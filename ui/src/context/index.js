@@ -2,6 +2,7 @@ import { AuthContext, AuthProvider } from './AuthContext';
 import NotificationContext, { NotificationProvider, useNotification } from './NotificationContext';
 import SSEContext, { SSEProvider, useSSEContext } from './SSEContext';
 import { VMContext, VMProvider } from './VMContext';
+import ThemeContext, { ThemeProvider } from './ThemeContext';
 
 export {
   AuthContext,
@@ -13,5 +14,7 @@ export {
   SSEProvider,
   useSSEContext,
   VMContext,
-  VMProvider
+  VMProvider,
+  ThemeContext,
+  ThemeProvider
 };

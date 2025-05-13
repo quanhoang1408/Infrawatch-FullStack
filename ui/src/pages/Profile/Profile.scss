@@ -1,0 +1,21 @@
+.profile-page {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 0 20px;
+
+  .profile-card {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    
+    .ant-card-head-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  }
+
+  .form-help-text {
+    color: #888;
+    font-size: 12px;
+    margin-top: 4px;
+  }
+}

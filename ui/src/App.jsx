@@ -18,6 +18,7 @@ import Dashboard from './pages/Dashboard';
 import VMList from './pages/VMList';
 import VMDetail from './pages/VMDetail/VMDetail';
 import Terminal from './pages/Terminal';
+import Settings from './pages/Settings';
 import Providers from './pages/Admin/Providers';
 import Users from './pages/Admin/Users';
 import VMAssignments from './pages/Admin/VMAssignments';
@@ -47,6 +48,7 @@ const App = () => {
                   <Route path="/vm" element={<VMList />} />
                   <Route path="/vm/:vmId" element={<VMDetail />} />
                   <Route path="/vm/:vmId/terminal" element={<Terminal />} />
+                  <Route path="/settings/*" element={<Settings />} />
 
                   {/* Admin routes */}
                   <Route element={<AdminRoute />}>

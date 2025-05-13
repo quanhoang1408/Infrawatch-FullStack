@@ -1,79 +1,118 @@
 import React, { useState } from 'react';
-import { 
-  Typography, 
-  Form, 
-  Input, 
-  Button, 
-  Divider, 
-  message, 
-  Avatar, 
-  Upload, 
-  Space 
+import {
+  Typography,
+  Form,
+  Input,
+  Button,
+  Divider,
+  message,
+  Avatar,
+  Upload,
+  Space
 } from 'antd';
-import { 
-  UserOutlined, 
-  MailOutlined, 
-  PhoneOutlined, 
-  UploadOutlined, 
-  LockOutlined 
+import {
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  UploadOutlined,
+  LockOutlined
 } from '@ant-design/icons';
-import { useMutation } from 'react-query';
-import { updateProfileService, changePasswordService } from '../../services/auth.service';
 import useAuth from '../../hooks/useAuth';
-import { validationRules } from '../../utils/validation.utils';
+import api from '../../services/api';
 
 const { Title, Text } = Typography;
+
+// Form validation rules
+const validationRules = {
+  required: { required: true, message: 'Trường này là bắt buộc' },
+  email: { type: 'email', message: 'Email không hợp lệ' },
+  phone: { pattern: /^[0-9+\-\s()]+$/, message: 'Số điện thoại không hợp lệ' }
+};
 
 /**
  * Profile settings component
  */
 const ProfileSettings = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserInContext } = useAuth();
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const [avatar, setAvatar] = useState(null);
-  
-  // Profile update mutation
-  const profileMutation = useMutation(updateProfileService, {
-    onSuccess: () => {
-      message.success('Thông tin cá nhân đã được cập nhật');
-    },
-    onError: (error) => {
-      message.error(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật thông tin cá nhân');
+  const [loading, setLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // Update profile handler
+  const handleUpdateProfile = async (values) => {
+    // Chỉ cập nhật nếu tên đã thay đổi
+    if (values.name === user.name) {
+      message.info('Tên của bạn không thay đổi');
+      return;
     }
-  });
-  
-  // Password change mutation
-  const passwordMutation = useMutation(changePasswordService, {
-    onSuccess: () => {
+
+    setLoading(true);
+
+    try {
+      // Gọi API để cập nhật tên người dùng
+      const response = await api.patch('/users/profile', { name: values.name });
+
+      // Cập nhật thông tin người dùng trong context
+      updateUserInContext(response.data);
+
+      message.success('Tên của bạn đã được cập nhật thành công');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+
+      // Hiển thị thông báo lỗi
+      let errorMessage = 'Không thể cập nhật thông tin cá nhân';
+
+      if (err.response) {
+        errorMessage += ': ' + (err.response.data?.message || err.response.statusText);
+      } else if (err.request) {
+        errorMessage += ': Lỗi kết nối đến server. Vui lòng kiểm tra kết nối mạng của bạn.';
+      } else {
+        errorMessage += ': ' + err.message;
+      }
+
+      message.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Change password handler
+  const handleChangePassword = async (values) => {
+    const { currentPassword, newPassword } = values;
+
+    setPasswordLoading(true);
+
+    try {
+      await api.post('/auth/change-password', { currentPassword, newPassword });
+
       message.success('Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại.');
       passwordForm.resetFields();
+
       setTimeout(() => {
         logout();
       }, 2000);
-    },
-    onError: (error) => {
-      message.error(error.response?.data?.message || 'Có lỗi xảy ra khi thay đổi mật khẩu');
+    } catch (err) {
+      console.error('Error changing password:', err);
+
+      // Hiển thị thông báo lỗi
+      let errorMessage = 'Có lỗi xảy ra khi thay đổi mật khẩu';
+
+      if (err.response) {
+        errorMessage += ': ' + (err.response.data?.message || err.response.statusText);
+      } else if (err.request) {
+        errorMessage += ': Lỗi kết nối đến server. Vui lòng kiểm tra kết nối mạng của bạn.';
+      } else {
+        errorMessage += ': ' + err.message;
+      }
+
+      message.error(errorMessage);
+    } finally {
+      setPasswordLoading(false);
     }
-  });
-  
-  // Update profile handler
-  const handleUpdateProfile = (values) => {
-    // Add avatar if changed
-    const userData = { ...values };
-    if (avatar) {
-      userData.avatar = avatar;
-    }
-    
-    profileMutation.mutate(userData);
   };
-  
-  // Change password handler
-  const handleChangePassword = (values) => {
-    const { currentPassword, newPassword } = values;
-    passwordMutation.mutate({ currentPassword, newPassword });
-  };
-  
+
   // Avatar upload props
   const uploadProps = {
     beforeUpload: (file) => {
@@ -83,31 +122,31 @@ const ProfileSettings = () => {
         message.error('Bạn chỉ có thể tải lên file hình ảnh!');
         return Upload.LIST_IGNORE;
       }
-      
+
       // Check file size (2MB max)
       const isLt2M = file.size / 1024 / 1024 < 2;
       if (!isLt2M) {
         message.error('Hình ảnh phải nhỏ hơn 2MB!');
         return Upload.LIST_IGNORE;
       }
-      
+
       // Store file
       setAvatar(file);
       return false;
     },
     maxCount: 1
   };
-  
+
   return (
     <div className="profile-settings">
       <Title level={2}>Thông tin cá nhân</Title>
-      
+
       <div className="settings-section">
         <div className="avatar-section" style={{ marginBottom: 24, textAlign: 'center' }}>
-          <Avatar 
-            size={100} 
-            icon={<UserOutlined />} 
-            src={user?.avatar} 
+          <Avatar
+            size={100}
+            icon={<UserOutlined />}
+            src={user?.avatar}
             style={{ marginBottom: 16 }}
           />
           <div>
@@ -116,7 +155,7 @@ const ProfileSettings = () => {
             </Upload>
           </div>
         </div>
-        
+
         <Form
           form={profileForm}
           layout="vertical"
@@ -135,52 +174,36 @@ const ProfileSettings = () => {
           >
             <Input prefix={<UserOutlined />} placeholder="Họ và tên" />
           </Form.Item>
-          
+
           <Form.Item
-            name="username"
-            label="Tên đăng nhập"
-            rules={[validationRules.required, validationRules.username]}
-          >
-            <Input 
-              prefix={<UserOutlined />} 
-              placeholder="Tên đăng nhập" 
-              disabled={true} // Username cannot be changed
-            />
-          </Form.Item>
-          
-          <Form.Item
-            name="email"
             label="Email"
-            rules={[validationRules.required, validationRules.email]}
           >
-            <Input prefix={<MailOutlined />} placeholder="Email" />
+            <Input
+              value={user?.email}
+              prefix={<MailOutlined />}
+              disabled={true}
+              style={{ backgroundColor: '#f5f5f5' }}
+            />
+            <div className="form-help-text">Email không thể thay đổi</div>
           </Form.Item>
-          
-          <Form.Item
-            name="phone"
-            label="Số điện thoại"
-            rules={[validationRules.phone]}
-          >
-            <Input prefix={<PhoneOutlined />} placeholder="Số điện thoại" />
-          </Form.Item>
-          
+
           <Form.Item>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
-              loading={profileMutation.isLoading}
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
             >
               Cập nhật thông tin
             </Button>
           </Form.Item>
         </Form>
       </div>
-      
+
       <Divider />
-      
+
       <div className="settings-section">
         <Title level={3}>Thay đổi mật khẩu</Title>
-        
+
         <Form
           form={passwordForm}
           layout="vertical"
@@ -191,12 +214,12 @@ const ProfileSettings = () => {
             label="Mật khẩu hiện tại"
             rules={[{ required: true, message: 'Vui lòng nhập mật khẩu hiện tại' }]}
           >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="Mật khẩu hiện tại" 
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Mật khẩu hiện tại"
             />
           </Form.Item>
-          
+
           <Form.Item
             name="newPassword"
             label="Mật khẩu mới"
@@ -209,12 +232,12 @@ const ProfileSettings = () => {
               }
             ]}
           >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="Mật khẩu mới" 
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Mật khẩu mới"
             />
           </Form.Item>
-          
+
           <Form.Item
             name="confirmPassword"
             label="Xác nhận mật khẩu mới"
@@ -231,24 +254,24 @@ const ProfileSettings = () => {
               }),
             ]}
           >
-            <Input.Password 
-              prefix={<LockOutlined />} 
-              placeholder="Xác nhận mật khẩu mới" 
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Xác nhận mật khẩu mới"
             />
           </Form.Item>
-          
+
           <Form.Item>
-            <Button 
-              type="primary" 
-              htmlType="submit" 
+            <Button
+              type="primary"
+              htmlType="submit"
               danger
-              loading={passwordMutation.isLoading}
+              loading={passwordLoading}
             >
               Thay đổi mật khẩu
             </Button>
           </Form.Item>
         </Form>
-        
+
         <Text type="secondary">
           Lưu ý: Bạn sẽ được đăng xuất sau khi thay đổi mật khẩu thành công.
         </Text>

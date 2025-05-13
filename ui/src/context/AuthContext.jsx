@@ -76,6 +76,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Cập nhật thông tin người dùng trong context
+  const updateUserInContext = (userData) => {
+    setUser(userData);
+  };
+
   const value = {
     user,
     loading,
@@ -83,6 +88,7 @@ export const AuthProvider = ({ children }) => {
     register,
     login,
     logout,
+    updateUserInContext,
     isAuthenticated: !!user,
   };
 

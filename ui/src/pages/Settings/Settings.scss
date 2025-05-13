@@ -1,63 +1,36 @@
 @import '../../styles/variables.scss';
 @import '../../styles/mixins.scss';
 
+// Define border-radius-base variable if not already defined in variables.scss
+$border-radius-base: $border-radius-md;
+
 .settings-container {
   padding: 0;
-  
+
   .settings-card {
     border-radius: $border-radius-base;
     height: 100%;
     min-height: 600px;
   }
-  
-  .settings-layout {
-    display: flex;
-    height: 100%;
-    
-    @include mobile {
-      flex-direction: column;
-    }
-  }
-  
-  .settings-sidebar {
-    width: 250px;
-    border-right: 1px solid var(--border-color);
-    
-    @include mobile {
-      width: 100%;
-      border-right: none;
-      border-bottom: 1px solid var(--border-color);
-      margin-bottom: 20px;
-    }
-    
-    .ant-menu {
-      height: 100%;
-      
-      &.ant-menu-inline {
-        border-right: none;
-      }
-    }
-  }
-  
+
   .settings-content {
-    flex: 1;
-    padding: 0 20px;
-    
+    padding: 20px;
+
     h2 {
       margin-top: 0;
       margin-bottom: 20px;
       padding-bottom: 10px;
       border-bottom: 1px solid var(--border-color);
     }
-    
+
     .settings-section {
       margin-bottom: 24px;
-      
+
       .section-title {
         margin-bottom: 16px;
         font-weight: 500;
       }
-      
+
       .ant-form-item:last-child {
         margin-bottom: 0;
       }
@@ -65,56 +38,16 @@
   }
 }
 
-.certificate-card {
-  margin-bottom: 16px;
-  @include transition(all, 0.3s);
-  
-  &:hover {
-    @include box-shadow(2);
+// Profile specific styles
+.profile-settings {
+  .avatar-section {
+    text-align: center;
+    margin-bottom: 24px;
   }
-  
-  .ant-card-head {
-    border-bottom: none;
-  }
-  
-  .certificate-info {
-    margin-top: 10px;
-    
-    p {
-      margin-bottom: 8px;
-    }
-    
-    .certificate-date {
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-color-secondary);
-      font-size: $font-size-sm;
-    }
-  }
-  
-  .certificate-vms {
-    margin-top: 16px;
-    
-    .vm-label {
-      display: inline-block;
-      margin-right: 8px;
-      margin-bottom: 8px;
-    }
-  }
-  
-  &.expired {
-    .ant-card-head-title {
-      color: var(--error-color);
-    }
-  }
-}
 
-.create-certificate-form {
-  .vm-selector {
-    width: 100%;
-  }
-  
-  .validity-select {
-    width: 100%;
+  .form-help-text {
+    color: var(--text-color-secondary);
+    font-size: $font-size-sm;
+    margin-top: 4px;
   }
 }

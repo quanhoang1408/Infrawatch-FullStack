@@ -1,20 +1,14 @@
 import { Navigate } from 'react-router-dom';
-import { 
-  DashboardOutlined, 
-  CloudServerOutlined, 
-  SettingOutlined, 
-  KeyOutlined, 
-  UserOutlined,
-  LineChartOutlined
+import {
+  DashboardOutlined,
+  CloudServerOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 import Dashboard from './pages/Dashboard';
 import VMList from './pages/VMList';
 import VMDetail from './pages/VMDetail';
 import Terminal from './pages/Terminal';
 import Settings from './pages/Settings';
-import SSHSettings from './pages/Settings/SSHSettings';
-import ProfileSettings from './pages/Settings/ProfileSettings';
-import GeneralSettings from './pages/Settings/GeneralSettings';
 import NotFound from './pages/NotFound';
 
 // Routes configuration for the main application
@@ -54,40 +48,10 @@ const routes = [
   },
   {
     path: '/settings',
-    name: 'Cài đặt',
+    name: 'Thông tin cá nhân',
     element: <Settings />,
-    icon: <SettingOutlined />,
-    showInMenu: true,
-    children: [
-      {
-        path: '/settings/general',
-        name: 'Cài đặt chung',
-        element: <GeneralSettings />,
-        icon: <SettingOutlined />,
-        showInMenu: true
-      },
-      {
-        path: '/settings/profile',
-        name: 'Thông tin cá nhân',
-        element: <ProfileSettings />,
-        icon: <UserOutlined />,
-        showInMenu: true
-      },
-      {
-        path: '/settings/ssh',
-        name: 'SSH Certificate',
-        element: <SSHSettings />,
-        icon: <KeyOutlined />,
-        showInMenu: true
-      },
-      {
-        path: '/settings/monitoring',
-        name: 'Giám sát',
-        element: <GeneralSettings />,
-        icon: <LineChartOutlined />,
-        showInMenu: true
-      }
-    ]
+    icon: <UserOutlined />,
+    showInMenu: true
   },
   {
     path: '*',

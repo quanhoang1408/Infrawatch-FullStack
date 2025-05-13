@@ -26,7 +26,10 @@ const api = axios.create({
   },
   // Add CORS settings
   withCredentials: false,
-  timeout: 30000, // 30 seconds timeout
+  timeout: 60000, // 60 seconds timeout - tăng timeout để tránh lỗi timeout
+  // Thêm cấu hình retry để tự động thử lại khi gặp lỗi network
+  maxRetries: 3,
+  retryDelay: 1000,
 });
 
 // Log all requests in development
@@ -73,7 +76,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for handling token refresh
+// Response interceptor for handling token refresh and network errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -89,13 +92,29 @@ api.interceptors.response.use(
 
     const originalRequest = error.config;
 
-    // If error is not 401 or request has already been retried, reject
-    if (error.response?.status !== 401 || originalRequest._retry) {
+    // Thêm logic retry cho lỗi network
+    if (!error.response && error.code === 'ECONNABORTED' && !originalRequest._networkRetry) {
+      // Lỗi timeout hoặc network
+      originalRequest._networkRetry = (originalRequest._networkRetry || 0) + 1;
+
+      // Chỉ retry tối đa 3 lần
+      if (originalRequest._networkRetry <= 3) {
+        console.log(`Retrying network request (${originalRequest._networkRetry}/3)...`);
+
+        // Đợi một khoảng thời gian trước khi thử lại
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        return api(originalRequest);
+      }
+    }
+
+    // If error is not 401 or request has already been retried for auth, reject
+    if (error.response?.status !== 401 || originalRequest._authRetry) {
       return Promise.reject(error);
     }
 
     // Attempt to refresh the token
-    originalRequest._retry = true;
+    originalRequest._authRetry = true;
     try {
       const refreshToken = getRefreshToken();
       if (!refreshToken) {

@@ -9,6 +9,7 @@ const eventsRoutes = require('./events/events.routes');
 const agentRoutes = require('./agent/agent.routes');
 const terminalRoutes = require('./terminal/terminal.routes');
 const vaultRoutes = require('./vault/vault.routes');
+const userRoutes = require('./users/user.routes');
 
 const router = express.Router();
 
@@ -21,5 +22,6 @@ router.use('/events', eventsRoutes);
 router.use('/agent', agentRoutes);
 router.use('/terminal', terminalRoutes);
 router.use('/vault', vaultRoutes);
+router.use('/users', userRoutes);
 
 module.exports = router;
