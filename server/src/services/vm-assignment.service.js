@@ -89,10 +89,41 @@ const hasAccessToVM = async (userId, vmId) => {
  * @returns {Promise<Array>} List of assignments
  */
 const getAllAssignments = async () => {
-  return VMAssignment.find()
-    .populate('userId', 'name email role')
-    .populate('vmId', 'name instanceId ipAddress state')
-    .populate('assignedBy', 'name email');
+  try {
+    const assignments = await VMAssignment.find()
+      .populate('userId', 'name email role')
+      .populate('vmId', 'name instanceId ipAddress state provider')
+      .populate('assignedBy', 'name email');
+
+    console.log(`Retrieved ${assignments.length} VM assignments`);
+    return assignments;
+  } catch (error) {
+    console.error('Error getting all assignments:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a single VM assignment by ID with populated data
+ * @param {string} assignmentId - Assignment ID
+ * @returns {Promise<Object>} Populated assignment object
+ */
+const getPopulatedAssignment = async (assignmentId) => {
+  try {
+    const assignment = await VMAssignment.findById(assignmentId)
+      .populate('userId', 'name email role')
+      .populate('vmId', 'name instanceId ipAddress state provider')
+      .populate('assignedBy', 'name email');
+
+    if (!assignment) {
+      throw new ApiError(404, 'Assignment not found');
+    }
+
+    return assignment;
+  } catch (error) {
+    console.error('Error getting populated assignment:', error);
+    throw error;
+  }
 };
 
 module.exports = {
@@ -102,4 +133,5 @@ module.exports = {
   getUsersAssignedToVM,
   hasAccessToVM,
   getAllAssignments,
+  getPopulatedAssignment,
 };

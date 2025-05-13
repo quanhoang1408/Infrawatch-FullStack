@@ -7,8 +7,15 @@ const { asyncHandler } = require('../../../utils/asyncHandler');
  */
 const assignVM = asyncHandler(async (req, res) => {
   const { vmId, userId } = req.body;
+  console.log(`Assigning VM ${vmId} to user ${userId} by admin ${req.user._id}`);
+
   const assignment = await vmAssignmentService.assignVMToUser(vmId, userId, req.user._id);
-  res.status(201).send(assignment);
+
+  // Populate the assignment data before sending response
+  const populatedAssignment = await vmAssignmentService.getPopulatedAssignment(assignment._id);
+  console.log('Assignment created successfully:', populatedAssignment);
+
+  res.status(201).send(populatedAssignment);
 });
 
 /**
@@ -16,7 +23,11 @@ const assignVM = asyncHandler(async (req, res) => {
  */
 const unassignVM = asyncHandler(async (req, res) => {
   const { vmId, userId } = req.body;
+  console.log(`Unassigning VM ${vmId} from user ${userId}`);
+
   await vmAssignmentService.unassignVMFromUser(vmId, userId);
+  console.log('Assignment removed successfully');
+
   res.status(204).send();
 });
 
@@ -24,7 +35,9 @@ const unassignVM = asyncHandler(async (req, res) => {
  * Get all VM assignments
  */
 const getAssignments = asyncHandler(async (req, res) => {
+  console.log('Getting all VM assignments');
   const assignments = await vmAssignmentService.getAllAssignments();
+  console.log(`Returning ${assignments.length} VM assignments`);
   res.send(assignments);
 });
 

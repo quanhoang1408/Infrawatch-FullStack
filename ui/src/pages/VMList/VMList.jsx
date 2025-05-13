@@ -98,7 +98,7 @@ const VMList = () => {
         type: toast.TYPE.ERROR,
         autoClose: 5000
       });
-
+    } finally {
       setRefreshing(false);
     }
   };

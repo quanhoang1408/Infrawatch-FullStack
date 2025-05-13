@@ -2,8 +2,14 @@ import React from 'react';
 import './ProviderIcon.scss';
 
 const ProviderIcon = ({ provider, size = 'md' }) => {
+  // Handle undefined or null provider
+  const safeProvider = provider || 'unknown';
+
   const getProviderIcon = () => {
-    switch (provider.toLowerCase()) {
+    // Check if provider is defined before calling toLowerCase
+    if (!provider) return null;
+
+    switch (safeProvider.toLowerCase()) {
       case 'aws':
         return '/images/providers/aws.svg';
       case 'azure':
@@ -18,7 +24,10 @@ const ProviderIcon = ({ provider, size = 'md' }) => {
   };
 
   const getProviderColor = () => {
-    switch (provider.toLowerCase()) {
+    // Check if provider is defined before calling toLowerCase
+    if (!provider) return 'var(--text-tertiary)';
+
+    switch (safeProvider.toLowerCase()) {
       case 'aws':
         return 'var(--aws-color)';
       case 'azure':
@@ -38,10 +47,10 @@ const ProviderIcon = ({ provider, size = 'md' }) => {
   return (
     <div className={`provider-icon provider-icon--${size}`} style={{ '--provider-color': providerColor }}>
       {iconSrc ? (
-        <img src={iconSrc} alt={`${provider} icon`} className="provider-icon__img" />
+        <img src={iconSrc} alt={`${safeProvider} icon`} className="provider-icon__img" />
       ) : (
         <div className="provider-icon__fallback">
-          {provider.charAt(0).toUpperCase()}
+          {safeProvider.charAt(0).toUpperCase()}
         </div>
       )}
     </div>

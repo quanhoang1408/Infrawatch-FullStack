@@ -1,31 +1,31 @@
 .vm-assignments {
   padding: 24px;
-  
+
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 24px;
   }
-  
+
   &__title {
     font-size: 24px;
     font-weight: 600;
     margin: 0;
   }
-  
+
   &__actions {
     display: flex;
     gap: 12px;
   }
-  
+
   &__content {
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     padding: 24px;
   }
-  
+
   &__loading {
     display: flex;
     justify-content: center;
@@ -81,12 +81,12 @@
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
-  
+
   &.role-admin {
     background-color: #faad14;
     color: #fff;
   }
-  
+
   &.role-user {
     background-color: #52c41a;
     color: #fff;
@@ -116,11 +116,24 @@
 .assignment-form-card {
   max-width: 600px;
   margin: 0 auto;
+  z-index: 100; /* Ensure it's above other elements */
+  position: relative; /* Ensure z-index works */
+}
+
+.assignment-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.assignment-form-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .assignment-form-title {
   font-size: 20px;
   font-weight: 600;
-  margin-bottom: 24px;
-  text-align: center;
+  margin: 0;
 }
